@@ -1,0 +1,633 @@
+#!/usr/bin/env python3
+"""Link or reset client skills in selected agent skill directories."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import termios
+import tty
+from dataclasses import dataclass
+from pathlib import Path
+
+
+SUPPORTED_AGENTS = ("agent", "claude", "codex", "cursor", "lingma", "trae")
+SKILLS_DIR_NAME = "skills"
+ALL_OPTION = "All"
+ACTION_LINK = "Link"
+ACTION_RESET = "Reset"
+UI_WIDTH = 78
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+
+
+@dataclass(frozen=True)
+class LinkResult:
+    agent: str
+    skill: str
+    status: str
+    message: str
+
+
+@dataclass(frozen=True)
+class SkillConflict:
+    agent: str
+    skill: str
+    target: Path
+    message: str
+
+
+def client_skills_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def default_project_root(skills_root: Path) -> Path:
+    for candidate in skills_root.parents:
+        if any((candidate / f".{agent}").exists() for agent in SUPPORTED_AGENTS):
+            return candidate
+    return skills_root.parent
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Symlink skills from this client-skills repository into selected agent "
+            "directories such as .codex/skills and .cursor/skills, or reset the "
+            "installed symlinks for selected agents and skills."
+        )
+    )
+    parser.add_argument(
+        "-a",
+        "--agents",
+        help=(
+            "Comma-separated agents to link, e.g. codex,cursor. "
+            "Use 'all' for every supported agent. Omit for interactive multi-select."
+        ),
+    )
+    parser.add_argument(
+        "-s",
+        "--source",
+        help="Skill source directory. Defaults to this client-skills repository.",
+    )
+    parser.add_argument(
+        "--skills",
+        help=(
+            "Comma-separated skills to link, e.g. figma,code-up-by-wilder. "
+            "Use 'all' for every skill. Omit for interactive multi-select."
+        ),
+    )
+    parser.add_argument(
+        "-p",
+        "--project-root",
+        help=(
+            "Target project root. Defaults to the nearest parent containing a supported "
+            "agent directory, or the parent of this client-skills repository."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned changes without modifying files.",
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Remove installed skill symlinks instead of creating them.",
+    )
+    return parser.parse_args()
+
+
+def list_skills(source_dir: Path) -> list[Path]:
+    if not source_dir.is_dir():
+        raise FileNotFoundError(f"skill source directory not found: {source_dir}")
+
+    return sorted(
+        skill_dir
+        for skill_dir in source_dir.iterdir()
+        if skill_dir.is_dir() and (skill_dir / "SKILL.md").is_file()
+    )
+
+
+def resolve_action(raw_reset: bool, raw_agents: str | None, raw_skills: str | None) -> str:
+    if raw_reset:
+        return ACTION_RESET
+
+    if raw_agents is None and raw_skills is None and is_interactive_terminal():
+        return prompt_single_choice(
+            title="Step 1/3 - Select action",
+            options=[ACTION_LINK, ACTION_RESET],
+        )
+
+    return ACTION_LINK
+
+
+def resolve_agents(raw_agents: str | None, title: str = "Step 2/3 - Select target agents") -> list[str]:
+    if raw_agents:
+        selected = [agent.strip().lower() for agent in raw_agents.split(",") if agent.strip()]
+        if selected == ["all"]:
+            return list(SUPPORTED_AGENTS)
+        return validate_agents(selected)
+
+    if is_interactive_terminal():
+        selected_agents = prompt_with_selector(
+            title=title,
+            options=[ALL_OPTION, *SUPPORTED_AGENTS],
+            empty_message="Select at least one model tool.",
+            all_index=0,
+        )
+        if ALL_OPTION in selected_agents:
+            return list(SUPPORTED_AGENTS)
+        return selected_agents
+
+    selected_agents = prompt_values_with_text_input(
+        title="Select target agents",
+        options=list(SUPPORTED_AGENTS),
+        allow_all_option=True,
+    )
+    if selected_agents == [ALL_OPTION]:
+        return list(SUPPORTED_AGENTS)
+    return selected_agents
+
+
+def resolve_skills(raw_skills: str | None, skills: list[Path], title: str = "Step 3/3 - Select skills") -> list[Path]:
+    skill_names = [skill.name for skill in skills]
+    skill_by_name = {skill.name: skill for skill in skills}
+
+    if raw_skills:
+        selected_names = [skill.strip() for skill in raw_skills.split(",") if skill.strip()]
+        if [name.lower() for name in selected_names] == ["all"]:
+            return skills
+        unknown_skills = [name for name in selected_names if name not in skill_by_name]
+        if unknown_skills:
+            available = ", ".join(skill_names)
+            raise ValueError(f"unsupported skills: {', '.join(unknown_skills)}. Available skills: {available}")
+        return [skill_by_name[name] for name in selected_names]
+
+    if is_interactive_terminal():
+        selected_names = prompt_with_selector(
+            title=title,
+            options=[ALL_OPTION, *skill_names],
+            empty_message="Select at least one skill.",
+            all_index=0,
+        )
+        if ALL_OPTION in selected_names:
+            return skills
+        return [skill_by_name[name] for name in selected_names]
+
+    selected_names = prompt_values_with_text_input(
+        title="Select skills",
+        options=skill_names,
+        allow_all_option=True,
+    )
+    if selected_names == [ALL_OPTION]:
+        return skills
+    return [skill_by_name[name] for name in selected_names]
+
+
+def validate_agents(agents: list[str]) -> list[str]:
+    seen: set[str] = set()
+    valid_agents: list[str] = []
+
+    for agent in agents:
+        if agent not in SUPPORTED_AGENTS:
+            supported = ", ".join(SUPPORTED_AGENTS)
+            raise ValueError(f"unsupported agent '{agent}'. Supported agents: {supported}")
+        if agent not in seen:
+            valid_agents.append(agent)
+            seen.add(agent)
+
+    if not valid_agents:
+        raise ValueError("no agents selected")
+
+    return valid_agents
+
+
+class TerminalSelector:
+    def __init__(
+        self,
+        title: str,
+        options: list[str],
+        empty_message: str,
+        all_index: int | None = None,
+        single_select: bool = False,
+    ):
+        self.title = title
+        self.options = options
+        self.empty_message = empty_message
+        self.all_index = all_index
+        self.single_select = single_select
+        self.cursor = 0
+        self.selected: set[int] = {0} if single_select and options else set()
+        self.message = ""
+        self.has_rendered = False
+
+    def select(self) -> list[str]:
+        hide_cursor()
+        try:
+            while True:
+                self.render()
+                key = read_key()
+                if key in ("up", "k"):
+                    self.cursor = (self.cursor - 1) % len(self.options)
+                    if self.single_select:
+                        self.selected = {self.cursor}
+                elif key in ("down", "j"):
+                    self.cursor = (self.cursor + 1) % len(self.options)
+                    if self.single_select:
+                        self.selected = {self.cursor}
+                elif key == "space":
+                    self.toggle_current()
+                elif key == "a":
+                    self.toggle_all()
+                elif key == "enter":
+                    if self.single_select:
+                        print()
+                        return [self.options[self.cursor]]
+                    if not self.selected:
+                        self.message = self.empty_message
+                        continue
+                    print()
+                    return [option for index, option in enumerate(self.options) if index in self.selected]
+                elif key in ("ctrl-c", "q"):
+                    raise KeyboardInterrupt
+        finally:
+            show_cursor()
+
+    def toggle_current(self) -> None:
+        if self.single_select:
+            self.selected = {self.cursor}
+            return
+
+        if self.cursor == self.all_index:
+            self.toggle_all()
+            return
+
+        if self.cursor in self.selected:
+            self.selected.remove(self.cursor)
+        else:
+            self.selected.add(self.cursor)
+        self.sync_all_option()
+
+    def toggle_all(self) -> None:
+        selectable_indexes = self.selectable_indexes()
+        if all(index in self.selected for index in selectable_indexes):
+            self.selected.clear()
+        else:
+            self.selected = set(selectable_indexes)
+            if self.all_index is not None:
+                self.selected.add(self.all_index)
+
+    def sync_all_option(self) -> None:
+        if self.all_index is None:
+            return
+
+        if all(index in self.selected for index in self.selectable_indexes()):
+            self.selected.add(self.all_index)
+        else:
+            self.selected.discard(self.all_index)
+
+    def selectable_indexes(self) -> list[int]:
+        return [index for index in range(len(self.options)) if index != self.all_index]
+
+    def render(self) -> None:
+        lines = self.render_lines()
+        if self.has_rendered:
+            print(f"\033[{len(lines)}F", end="")
+        self.has_rendered = True
+
+        for line in lines:
+            print(f"\033[2K\r{line}")
+        self.message = ""
+
+    def render_lines(self) -> list[str]:
+        selected_count = len([index for index in self.selected if index != self.all_index])
+        border = color("+" + "-" * UI_WIDTH + "+", CYAN)
+        lines = [
+            border,
+            box_line(self.title, BOLD + CYAN),
+            box_line("Up/Down or j/k move  Space select  A toggle all  Enter confirm  q cancel", DIM),
+            box_line(f"{selected_count} selected", GREEN if selected_count else YELLOW),
+            border,
+        ]
+
+        for index, option in enumerate(self.options):
+            marker = color("[x]", GREEN) if index in self.selected else color("[ ]", DIM)
+            pointer = color(">", CYAN) if index == self.cursor else " "
+            option_text = color(option, BOLD) if index == self.cursor else option
+            lines.append(f"{pointer} {marker} {option_text}")
+        lines.append(color(self.message, YELLOW) if self.message else "")
+        return lines
+
+
+def prompt_with_selector(
+    title: str,
+    options: list[str],
+    empty_message: str,
+    all_index: int | None = None,
+) -> list[str]:
+    return TerminalSelector(
+        title=title,
+        options=options,
+        empty_message=empty_message,
+        all_index=all_index,
+    ).select()
+
+
+def prompt_single_choice(title: str, options: list[str], default_index: int = 0) -> str:
+    selector = TerminalSelector(
+        title=title,
+        options=options,
+        empty_message="Select one option.",
+        single_select=True,
+    )
+    selector.cursor = default_index if 0 <= default_index < len(options) else 0
+    selector.selected = {selector.cursor}
+    return selector.select()[0]
+
+
+def read_key() -> str:
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        key = sys.stdin.read(1)
+        if key == "\x03":
+            return "ctrl-c"
+        if key in ("\r", "\n"):
+            return "enter"
+        if key == " ":
+            return "space"
+        if key == "\x1b":
+            sequence = sys.stdin.read(2)
+            if sequence == "[A":
+                return "up"
+            if sequence == "[B":
+                return "down"
+        return key.lower()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def hide_cursor() -> None:
+    print("\033[?25l", end="")
+
+
+def show_cursor() -> None:
+    print("\033[?25h", end="")
+
+
+def color(text: str, style: str) -> str:
+    if os.environ.get("NO_COLOR"):
+        return text
+    return f"{style}{text}{RESET}"
+
+
+def box_line(text: str, style: str) -> str:
+    content_width = UI_WIDTH - 2
+    visible_text = text[:content_width].ljust(content_width)
+    return f"| {color(visible_text, style)} |"
+
+
+def is_interactive_terminal() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def prompt_values_with_text_input(title: str, options: list[str], allow_all_option: bool) -> list[str]:
+    display_options = [ALL_OPTION, *options] if allow_all_option else options
+    print(f"{title}:")
+    for index, option in enumerate(display_options, start=1):
+        print(f"  {index}. {option}")
+    print("Enter numbers or names separated by commas.")
+
+    answer = input("Selection: ").strip()
+    if answer.lower() == "all":
+        return [ALL_OPTION] if allow_all_option else options
+
+    selected: list[str] = []
+    for item in [part.strip() for part in answer.split(",") if part.strip()]:
+        if item.isdigit():
+            position = int(item)
+            if position < 1 or position > len(display_options):
+                raise ValueError(f"selection index out of range: {item}")
+            selected.append(display_options[position - 1])
+        else:
+            selected.append(item)
+
+    if allow_all_option and ALL_OPTION in selected:
+        return [ALL_OPTION]
+
+    invalid_options = [option for option in selected if option not in options]
+    if invalid_options:
+        available = ", ".join(display_options)
+        raise ValueError(f"unsupported selections: {', '.join(invalid_options)}. Available options: {available}")
+
+    if not selected:
+        raise ValueError("no selections selected")
+
+    return selected
+
+
+def symlink_target(target: Path) -> Path:
+    current_target = Path(os.readlink(target))
+    if current_target.is_absolute():
+        return current_target
+    return target.parent / current_target
+
+
+def find_conflicts(project_root: Path, skills: list[Path], agents: list[str]) -> list[SkillConflict]:
+    conflicts: list[SkillConflict] = []
+
+    for agent in agents:
+        agent_skills_dir = project_root / f".{agent}" / SKILLS_DIR_NAME
+        for skill_dir in skills:
+            source = skill_dir.resolve()
+            target = agent_skills_dir / skill_dir.name
+            if target.is_symlink():
+                resolved_target = symlink_target(target).resolve()
+                if resolved_target != source:
+                    conflicts.append(
+                        SkillConflict(
+                            agent=agent,
+                            skill=skill_dir.name,
+                            target=target,
+                            message=f"existing symlink points to {resolved_target}",
+                        )
+                    )
+            elif target.exists():
+                conflicts.append(
+                    SkillConflict(
+                        agent=agent,
+                        skill=skill_dir.name,
+                        target=target,
+                        message="existing directory or file",
+                    )
+                )
+
+    return conflicts
+
+
+def confirm_overwrite(conflicts: list[SkillConflict]) -> bool:
+    """Prompt user to confirm overwriting conflicting skills."""
+    if not conflicts:
+        return True
+
+    print("\n" + color("Conflicting skills found:", YELLOW))
+    for conflict in conflicts:
+        print(f"  - {conflict.agent}/{conflict.skill}: {conflict.target} ({conflict.message})")
+
+    try:
+        answer = input("\nOverwrite these conflicts? [y/N]: ").strip().lower()
+        return answer in ("y", "yes")
+    except (EOFError, KeyboardInterrupt):
+        print("\nCanceled.")
+        return False
+
+
+def link_skill(source: Path, target: Path, dry_run: bool) -> str:
+    if target.is_symlink() and symlink_target(target).resolve() == source:
+        return "already linked"
+    if dry_run:
+        return f"would link -> {source}"
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # Remove existing symlink or file/directory before creating new one
+    if target.exists() or target.is_symlink():
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        else:
+            import shutil
+            shutil.rmtree(target)
+    target.symlink_to(source, target_is_directory=True)
+    return f"linked -> {source}"
+
+
+def reset_skill(target: Path, dry_run: bool) -> str:
+    if target.is_symlink():
+        if dry_run:
+            return "would unlink"
+        target.unlink()
+        return "unlinked"
+    if target.exists():
+        return "skipped existing non-symlink"
+    return "not installed"
+
+
+def link_agent_skills(
+    project_root: Path,
+    skills: list[Path],
+    agents: list[str],
+    dry_run: bool,
+) -> list[LinkResult]:
+    results: list[LinkResult] = []
+
+    for agent in agents:
+        agent_skills_dir = project_root / f".{agent}" / SKILLS_DIR_NAME
+        for skill_dir in skills:
+            source = skill_dir.resolve()
+            target = agent_skills_dir / skill_dir.name
+            try:
+                message = link_skill(source, target, dry_run=dry_run)
+                status = "ok"
+            except OSError as exc:
+                message = str(exc)
+                status = "error"
+            results.append(LinkResult(agent=agent, skill=skill_dir.name, status=status, message=message))
+
+    return results
+
+
+def reset_agent_skills(
+    project_root: Path,
+    skills: list[Path],
+    agents: list[str],
+    dry_run: bool,
+) -> list[LinkResult]:
+    results: list[LinkResult] = []
+
+    for agent in agents:
+        agent_skills_dir = project_root / f".{agent}" / SKILLS_DIR_NAME
+        for skill_dir in skills:
+            target = agent_skills_dir / skill_dir.name
+            try:
+                message = reset_skill(target, dry_run=dry_run)
+                status = "ok" if message in ("unlinked", "would unlink") else "skipped"
+            except OSError as exc:
+                message = str(exc)
+                status = "error"
+            results.append(LinkResult(agent=agent, skill=skill_dir.name, status=status, message=message))
+
+    return results
+
+
+def print_results(results: list[LinkResult]) -> None:
+    for result in results:
+        print(f"[{result.status}] {result.agent}/{result.skill}: {result.message}")
+
+    summary: dict[str, int] = {}
+    for result in results:
+        summary[result.status] = summary.get(result.status, 0) + 1
+
+    summary_text = ", ".join(f"{status}={count}" for status, count in sorted(summary.items()))
+    print(f"Summary: {summary_text}")
+
+
+def print_conflicts(conflicts: list[SkillConflict]) -> None:
+    print("Conflict skills found. Resolve these targets before linking:", file=sys.stderr)
+    for conflict in conflicts:
+        print(
+            f"- {conflict.agent}/{conflict.skill}: {conflict.target} ({conflict.message})",
+            file=sys.stderr,
+        )
+
+
+def main() -> int:
+    args = parse_args()
+    skills_root = client_skills_root()
+    source_dir = Path(args.source).expanduser().resolve() if args.source else skills_root
+    project_root = (
+        Path(args.project_root).expanduser().resolve()
+        if args.project_root
+        else default_project_root(skills_root)
+    )
+
+    try:
+        skills = list_skills(source_dir)
+        action = resolve_action(args.reset, args.agents, args.skills)
+        agents = resolve_agents(args.agents)
+        selected_skills = resolve_skills(args.skills, skills)
+        if action == ACTION_RESET:
+            results = reset_agent_skills(
+                project_root=project_root,
+                skills=selected_skills,
+                agents=agents,
+                dry_run=args.dry_run,
+            )
+        else:
+            conflicts = find_conflicts(project_root=project_root, skills=selected_skills, agents=agents)
+            if conflicts:
+                if not confirm_overwrite(conflicts):
+                    return 130
+            results = link_agent_skills(
+                project_root=project_root,
+                skills=selected_skills,
+                agents=agents,
+                dry_run=args.dry_run,
+            )
+    except KeyboardInterrupt:
+        print("\nCanceled.", file=sys.stderr)
+        return 130
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print_results(results)
+    return 1 if any(result.status == "error" for result in results) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

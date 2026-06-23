@@ -1,0 +1,5 @@
+interface:
+  display_name: Code Up By Wilder
+  short_description: Skill matching for coding tasks.
+  icon: code
+  primary_color: "#2563eb"

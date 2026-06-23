@@ -1,0 +1,4 @@
+interface:
+  display_name: "代码清理"
+  short_description: "在保持行为不变的前提下简化代码"
+  default_prompt: "使用 $code-cleanup-by-wilder 对最近修改的代码进行简化与整理，同时保持功能完全一致。"
