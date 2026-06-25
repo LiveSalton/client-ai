@@ -1,0 +1,4 @@
+interface:
+  display_name: "项目发布流程"
+  short_description: "按项目现有门禁执行发布流程。"
+  default_prompt: "使用 $project-release 梳理当前项目的发布流程。"
