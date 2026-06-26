@@ -1,20 +1,30 @@
 # client-ai
 
-`client-ai` 用于集中管理客户端研发场景下的 AI 辅助资产，当前主要沉淀为可复用的 `skills`。这些 skill 面向 Android 客户端、OpenSpec 流程、Stitch/UI 设计、代码质量治理和文档反向梳理等工作流，便于在不同 AI 编码工具之间复用同一套规范。
+`client-ai` 用于集中管理客户端研发场景下的 AI 辅助资产，当前沉淀为可复用的 `skills` 与 Codex custom agents。这些资产面向 Android 客户端、OpenSpec 流程、Stitch/UI 设计、代码质量治理、多 Agent 协作和文档反向梳理等工作流，便于在不同 AI 编码工具之间复用同一套规范。
 
-> 当前仓库仍在整理中：已有内容以 `skills/` 为主；`agents/`、`commands/`、`rules/` 已预留目录，但暂未放入可用文件。
+> 当前仓库仍在整理中：已有内容以 `skills/` 和 `agents/codex/` 为主；`commands/`、`rules/` 已预留目录，但暂未放入可用文件。
 
 ## 目录结构
 
 ```text
 client-ai/
-├── agents/                  # 预留：不同 AI Agent 的配置或编排文件
+├── agents/
+│   └── codex/               # Codex custom agents 配置
 ├── commands/                # 预留：命令模板或快捷指令
 ├── install-link-client-skills
 ├── rules/                   # 预留：通用规则、项目规则或工具规则
 └── skills/
     ├── link-client-skills   # 将本仓库 skill 链接到目标 AI 工具目录的脚本
     ├── agent-harness/
+    ├── multi-agent-collaboration/
+    ├── before-you-build/
+    ├── design-system-patterns/
+    ├── interaction-design/
+    ├── taste-quality-gate/
+    ├── error-handling-patterns/
+    ├── systematic-debugging/
+    ├── code-review-excellence/
+    ├── verification-before-completion/
     ├── android_ui_verification/
     ├── app-store-optimization/
     ├── code-up-by-wilder/
@@ -50,15 +60,20 @@ client-ai/
 
 ### 2. 多工具链接脚本
 
-`skills/link-client-skills` 是一个 Python 脚本，用于把本仓库中的 skill 以符号链接方式安装到目标项目的 AI 工具目录。
+`skills/link-client-skills` 是一个 Python 脚本，用于把本仓库中的 skill 和 Codex custom agents 以符号链接方式安装到目标项目的 AI 工具目录。
 
 当前脚本支持的目标工具：
 
 - `claude` → `.claude/skills`
 - `codex` → `.codex/skills`
+- `agent` → `.agent/skills`
 - `cursor` → `.cursor/skills`
 - `lingma` → `.lingma/skills`
 - `trae` → `.trae/skills`
+
+Codex custom agents 单独链接到：
+
+- `.codex/agents`
 
 安装为全局命令：
 
@@ -94,6 +109,16 @@ python3 skills/link-client-skills
 # 链接全部 skill 到 Codex
 link-client-skills --agents codex --skills all
 
+# 链接多 Agent 协作能力；选中 multi-agent-collaboration 时会自动链接 Codex custom agents
+link-client-skills --agents all \
+  --skills multi-agent-collaboration,before-you-build,design-system-patterns,interaction-design,taste-quality-gate,error-handling-patterns,systematic-debugging,code-review-excellence,verification-before-completion
+
+# 仅链接 Codex custom agents
+link-client-skills --codex-agents all
+
+# 只链接 skill，不自动链接 Codex custom agents
+link-client-skills --agents all --skills multi-agent-collaboration --no-codex-agents
+
 # 链接指定 skill 到多个工具
 link-client-skills --agents codex,cursor --skills code-up-by-wilder,code-cleanup-by-wilder
 
@@ -113,8 +138,22 @@ link-client-skills --agents all --skills all --dry-run
 | Skill | 用途 |
 | --- | --- |
 | `agent-harness` | 为项目生成 `AGENTS.md` 入口和 `doc/` 协作文档体系。 |
+| `multi-agent-collaboration` | 编排 Product、Designer、Coder、Reviewer 的角色门禁、状态机、交接格式和交付门禁。 |
+| `before-you-build` | 在新产品、MVP、Agent 工作流或重大功能开工前做产品风险预检。 |
 | `page-route-book` | 扫描页面、生成页面路书，并维护页面中文定位注释。 |
 | `reverse-doc-skill` | 从现有代码反向生成产品文档和技术文档。 |
+
+### 多 Agent 角色方法
+
+| Skill | 用途 |
+| --- | --- |
+| `design-system-patterns` | 将设计事实映射为组件、token、资源和命名约束。 |
+| `interaction-design` | 定义交互流、状态表、反馈、取消、重试和恢复行为。 |
+| `taste-quality-gate` | 对新视觉、重设计、首屏、订阅页等做最终视觉质量检查。 |
+| `error-handling-patterns` | 处理网络、文件、权限、系统 API、计费、广告、并发和生命周期等失败路径。 |
+| `systematic-debugging` | 在 bug、崩溃、构建失败或异常行为修复前做根因调查。 |
+| `code-review-excellence` | 对代码、配置、资源、构建、迁移或脚本变更做独立审查。 |
+| `verification-before-completion` | 在声明完成、通过、可提交或可交付前收集新鲜验证证据。 |
 
 ### 编码规范与质量治理
 
@@ -171,17 +210,26 @@ link-client-skills --agents all --skills all --dry-run
 
 ## 当前状态与后续补充
 
+### Codex Custom Agents
+
+| Agent | 用途 |
+| --- | --- |
+| `product` | 需求目标、范围、用户流程、数据源、验收标准和最终产品验收。 |
+| `designer` | 设计源转译、组件映射、状态、token、资源、交互和动效约束。 |
+| `coder` | 在 Product/Designer 已确认范围内实现，不扩大范围，不绕过项目规则。 |
+| `reviewer` | 独立检查实际 diff、文档同步、验证证据、回归风险和交付结论。 |
+
 当前已具备：
 
 - 一组客户端研发相关 skill。
 - Stitch 与 UI 设计相关 skill。
 - OpenSpec 常用工作流 skill。
+- 多 Agent 协作 skill、角色方法 skill 和 Codex custom agents。
 - 面向多 AI 工具的 skill 链接脚本。
 - 全局安装脚本 `install-link-client-skills`。
 
 当前暂未体现：
 
-- `agents/` 下的 Agent 配置集合。
 - `commands/` 下的命令模板。
 - `rules/` 下的通用规则文件。
 

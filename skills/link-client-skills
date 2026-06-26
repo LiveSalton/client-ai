@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Link or reset client skills in selected agent skill directories."""
+"""Link or reset client skills and Codex agent configs."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from pathlib import Path
 
 SUPPORTED_AGENTS = ("agent", "claude", "codex", "cursor", "lingma", "trae")
 SKILLS_DIR_NAME = "skills"
+CODEX_AGENT_CONFIGS_DIR = "agents/codex"
 ALL_OPTION = "All"
 ACTION_LINK = "Link"
 ACTION_RESET = "Reset"
@@ -46,6 +47,10 @@ def client_skills_root() -> Path:
     return Path(__file__).resolve().parent
 
 
+def client_repo_root() -> Path:
+    return client_skills_root().parent
+
+
 def default_project_root() -> Path:
     return Path.cwd().resolve()
 
@@ -53,9 +58,8 @@ def default_project_root() -> Path:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Symlink skills from this client-skills repository into selected agent "
-            "directories such as .codex/skills and .cursor/skills, or reset the "
-            "installed symlinks for selected agents and skills."
+            "Symlink skills and Codex custom agent configs from this client-ai "
+            "repository into selected project tool directories."
         )
     )
     parser.add_argument(
@@ -77,6 +81,19 @@ def parse_args() -> argparse.Namespace:
             "Comma-separated skills to link, e.g. figma,code-up-by-wilder. "
             "Use 'all' for every skill. Omit for interactive multi-select."
         ),
+    )
+    parser.add_argument(
+        "--codex-agents",
+        help=(
+            "Comma-separated Codex custom agent configs to link, e.g. product,reviewer. "
+            "Use 'all' for every config under agents/codex. When omitted, configs are "
+            "linked automatically if multi-agent-collaboration is selected."
+        ),
+    )
+    parser.add_argument(
+        "--no-codex-agents",
+        action="store_true",
+        help="Do not auto-link Codex custom agent configs when multi-agent-collaboration is selected.",
     )
     parser.add_argument(
         "-p",
@@ -109,11 +126,32 @@ def list_skills(source_dir: Path) -> list[Path]:
     )
 
 
-def resolve_action(raw_reset: bool, raw_agents: str | None, raw_skills: str | None) -> str:
+def list_codex_agent_configs(source_dir: Path) -> list[Path]:
+    if not source_dir.is_dir():
+        return []
+
+    return sorted(
+        agent_config
+        for agent_config in source_dir.iterdir()
+        if agent_config.is_file() and agent_config.suffix == ".toml"
+    )
+
+
+def resolve_action(
+    raw_reset: bool,
+    raw_agents: str | None,
+    raw_skills: str | None,
+    raw_codex_agents: str | None,
+) -> str:
     if raw_reset:
         return ACTION_RESET
 
-    if raw_agents is None and raw_skills is None and is_interactive_terminal():
+    if (
+        raw_agents is None
+        and raw_skills is None
+        and raw_codex_agents is None
+        and is_interactive_terminal()
+    ):
         return prompt_single_choice(
             title="Step 1/3 - Select action",
             options=[ACTION_LINK, ACTION_RESET],
@@ -183,6 +221,47 @@ def resolve_skills(raw_skills: str | None, skills: list[Path], title: str = "Ste
     if selected_names == [ALL_OPTION]:
         return skills
     return [skill_by_name[name] for name in selected_names]
+
+
+def resolve_codex_agent_configs(raw_codex_agents: str | None, configs: list[Path]) -> list[Path]:
+    if raw_codex_agents is None:
+        return []
+
+    if not configs:
+        raise FileNotFoundError(f"Codex agent config directory is empty: {client_repo_root() / CODEX_AGENT_CONFIGS_DIR}")
+
+    config_names = [config.stem for config in configs]
+    config_by_name = {config.stem: config for config in configs}
+    config_by_filename = {config.name: config for config in configs}
+
+    selected_names = [name.strip() for name in raw_codex_agents.split(",") if name.strip()]
+    if not selected_names:
+        raise ValueError("no Codex agent configs selected")
+    if [name.lower() for name in selected_names] == ["all"]:
+        return configs
+
+    selected_configs: list[Path] = []
+    unknown_configs: list[str] = []
+    for name in selected_names:
+        if name in config_by_name:
+            selected_configs.append(config_by_name[name])
+        elif name in config_by_filename:
+            selected_configs.append(config_by_filename[name])
+        else:
+            unknown_configs.append(name)
+
+    if unknown_configs:
+        available = ", ".join(config_names)
+        raise ValueError(
+            f"unsupported Codex agent configs: {', '.join(unknown_configs)}. "
+            f"Available configs: {available}"
+        )
+
+    return selected_configs
+
+
+def should_auto_link_codex_agents(selected_skills: list[Path]) -> bool:
+    return any(skill.name == "multi-agent-collaboration" for skill in selected_skills)
 
 
 def validate_agents(agents: list[str]) -> list[str]:
@@ -435,7 +514,7 @@ def symlink_target(target: Path) -> Path:
     return target.parent / current_target
 
 
-def find_conflicts(project_root: Path, skills: list[Path], agents: list[str]) -> list[SkillConflict]:
+def find_skill_conflicts(project_root: Path, skills: list[Path], agents: list[str]) -> list[SkillConflict]:
     conflicts: list[SkillConflict] = []
 
     for agent in agents:
@@ -463,6 +542,37 @@ def find_conflicts(project_root: Path, skills: list[Path], agents: list[str]) ->
                         message="existing directory or file",
                     )
                 )
+
+    return conflicts
+
+
+def find_codex_agent_conflicts(project_root: Path, configs: list[Path]) -> list[SkillConflict]:
+    conflicts: list[SkillConflict] = []
+    target_dir = project_root / ".codex" / "agents"
+
+    for config in configs:
+        source = config.resolve()
+        target = target_dir / config.name
+        if target.is_symlink():
+            resolved_target = symlink_target(target).resolve()
+            if resolved_target != source:
+                conflicts.append(
+                    SkillConflict(
+                        agent="codex-agent",
+                        skill=config.name,
+                        target=target,
+                        message=f"existing symlink points to {resolved_target}",
+                    )
+                )
+        elif target.exists():
+            conflicts.append(
+                SkillConflict(
+                    agent="codex-agent",
+                    skill=config.name,
+                    target=target,
+                    message="existing directory or file",
+                )
+            )
 
     return conflicts
 
@@ -499,6 +609,23 @@ def link_skill(source: Path, target: Path, dry_run: bool) -> str:
             import shutil
             shutil.rmtree(target)
     target.symlink_to(source, target_is_directory=True)
+    return f"linked -> {source}"
+
+
+def link_file(source: Path, target: Path, dry_run: bool) -> str:
+    if target.is_symlink() and symlink_target(target).resolve() == source:
+        return "already linked"
+    if dry_run:
+        return f"would link -> {source}"
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.is_symlink():
+        if target.is_dir() and not target.is_symlink():
+            import shutil
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    target.symlink_to(source)
     return f"linked -> {source}"
 
 
@@ -560,6 +687,49 @@ def reset_agent_skills(
     return results
 
 
+def link_codex_agent_configs(
+    project_root: Path,
+    configs: list[Path],
+    dry_run: bool,
+) -> list[LinkResult]:
+    results: list[LinkResult] = []
+    target_dir = project_root / ".codex" / "agents"
+
+    for config in configs:
+        source = config.resolve()
+        target = target_dir / config.name
+        try:
+            message = link_file(source, target, dry_run=dry_run)
+            status = "ok"
+        except OSError as exc:
+            message = str(exc)
+            status = "error"
+        results.append(LinkResult("codex-agent", config.stem, status, message))
+
+    return results
+
+
+def reset_codex_agent_configs(
+    project_root: Path,
+    configs: list[Path],
+    dry_run: bool,
+) -> list[LinkResult]:
+    results: list[LinkResult] = []
+    target_dir = project_root / ".codex" / "agents"
+
+    for config in configs:
+        target = target_dir / config.name
+        try:
+            message = reset_skill(target, dry_run=dry_run)
+            status = "ok" if message in ("unlinked", "would unlink") else "skipped"
+        except OSError as exc:
+            message = str(exc)
+            status = "error"
+        results.append(LinkResult("codex-agent", config.stem, status, message))
+
+    return results
+
+
 def print_results(results: list[LinkResult]) -> None:
     for result in results:
         print(f"[{result.status}] {result.agent}/{result.skill}: {result.message}")
@@ -585,6 +755,7 @@ def main() -> int:
     args = parse_args()
     skills_root = client_skills_root()
     source_dir = Path(args.source).expanduser().resolve() if args.source else skills_root
+    codex_agent_source_dir = client_repo_root() / CODEX_AGENT_CONFIGS_DIR
     project_root = (
         Path(args.project_root).expanduser().resolve()
         if args.project_root
@@ -592,28 +763,79 @@ def main() -> int:
     )
 
     try:
+        if args.codex_agents is not None and args.no_codex_agents:
+            raise ValueError("--codex-agents and --no-codex-agents cannot be used together")
+
         skills = list_skills(source_dir)
-        action = resolve_action(args.reset, args.agents, args.skills)
-        agents = resolve_agents(args.agents)
-        selected_skills = resolve_skills(args.skills, skills)
-        if action == ACTION_RESET:
-            results = reset_agent_skills(
-                project_root=project_root,
-                skills=selected_skills,
-                agents=agents,
-                dry_run=args.dry_run,
-            )
+        codex_agent_configs = list_codex_agent_configs(codex_agent_source_dir)
+        action = resolve_action(args.reset, args.agents, args.skills, args.codex_agents)
+        should_handle_skills = args.codex_agents is None or args.agents is not None or args.skills is not None
+        agents = resolve_agents(args.agents) if should_handle_skills else []
+        selected_skills = resolve_skills(args.skills, skills) if should_handle_skills else []
+        if args.codex_agents is not None:
+            selected_codex_agent_configs = resolve_codex_agent_configs(args.codex_agents, codex_agent_configs)
+        elif args.no_codex_agents:
+            selected_codex_agent_configs = []
+        elif should_auto_link_codex_agents(selected_skills):
+            selected_codex_agent_configs = codex_agent_configs
         else:
-            conflicts = find_conflicts(project_root=project_root, skills=selected_skills, agents=agents)
+            selected_codex_agent_configs = []
+        results: list[LinkResult] = []
+        if action == ACTION_RESET:
+            if selected_skills:
+                results.extend(
+                    reset_agent_skills(
+                        project_root=project_root,
+                        skills=selected_skills,
+                        agents=agents,
+                        dry_run=args.dry_run,
+                    )
+                )
+            if selected_codex_agent_configs:
+                results.extend(
+                    reset_codex_agent_configs(
+                        project_root=project_root,
+                        configs=selected_codex_agent_configs,
+                        dry_run=args.dry_run,
+                    )
+                )
+        else:
+            conflicts = []
+            if selected_skills:
+                conflicts.extend(
+                    find_skill_conflicts(
+                        project_root=project_root,
+                        skills=selected_skills,
+                        agents=agents,
+                    )
+                )
+            if selected_codex_agent_configs:
+                conflicts.extend(
+                    find_codex_agent_conflicts(
+                        project_root=project_root,
+                        configs=selected_codex_agent_configs,
+                    )
+                )
             if conflicts:
                 if not confirm_overwrite(conflicts):
                     return 130
-            results = link_agent_skills(
-                project_root=project_root,
-                skills=selected_skills,
-                agents=agents,
-                dry_run=args.dry_run,
-            )
+            if selected_skills:
+                results.extend(
+                    link_agent_skills(
+                        project_root=project_root,
+                        skills=selected_skills,
+                        agents=agents,
+                        dry_run=args.dry_run,
+                    )
+                )
+            if selected_codex_agent_configs:
+                results.extend(
+                    link_codex_agent_configs(
+                        project_root=project_root,
+                        configs=selected_codex_agent_configs,
+                        dry_run=args.dry_run,
+                    )
+                )
     except KeyboardInterrupt:
         print("\nCanceled.", file=sys.stderr)
         return 130
