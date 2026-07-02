@@ -1,0 +1,36 @@
+digraph DependencyImpact {
+  graph [rankdir=TB, label="Order Platform Dependency Impact", labelloc=t, fontsize=18];
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#64748b", fontname="Inter"];
+  edge [color="#475569", fontname="Inter", fontsize=10];
+
+  subgraph cluster_ui {
+    label="UI";
+    color="#93c5fd";
+    web_app [label="Web App\nsourceRefs: system-context.structurizr.dsl#web"];
+  }
+
+  subgraph cluster_backend {
+    label="Backend";
+    color="#86efac";
+    order_api [label="Order API\nsourceRefs: system-context.structurizr.dsl#api"];
+    fulfillment_worker [label="Fulfillment Worker\nsourceRefs: system-context.structurizr.dsl#worker"];
+  }
+
+  subgraph cluster_data {
+    label="Data and Messaging";
+    color="#fbbf24";
+    orders_db [shape=cylinder, label="Orders Database\nsourceRefs: system-context.structurizr.dsl#ordersDb"];
+    order_events [shape=folder, label="Order Events\nsourceRefs: system-context.structurizr.dsl#events"];
+  }
+
+  payment_gateway [label="Payment Gateway\nexternal"];
+  warehouse_system [label="Warehouse System\nexternal"];
+
+  web_app -> order_api [label="places order"];
+  order_api -> orders_db [label="writes order"];
+  order_api -> payment_gateway [label="authorizes payment"];
+  order_api -> order_events [label="publishes OrderPlaced"];
+  fulfillment_worker -> order_events [label="consumes OrderPlaced"];
+  fulfillment_worker -> orders_db [label="updates fulfillment"];
+  fulfillment_worker -> warehouse_system [label="requests fulfillment", style=dashed];
+}

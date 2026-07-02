@@ -1,0 +1,12 @@
+{
+  "id": "dsl",
+  "label": "Structurizr DSL",
+  "extensions": ["dsl"],
+  "pathGlobs": ["**/workspace.dsl", "**/workspace.json", "**/*.structurizr.dsl", "**/*.structurizr.js", "**/*.structurizr.json"],
+  "contentProbe": {
+    "extensions": ["dsl"],
+    "prefixBytes": 32768,
+    "patterns": ["^\\s*workspace(?:\\s+extends|\\s+\\\"|\\s*\\{)"]
+  },
+  "dataKey": "aicoding.formatViewer.dsl"
+}

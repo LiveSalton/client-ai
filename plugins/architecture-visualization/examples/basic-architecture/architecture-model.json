@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "name": "Order Platform Architecture",
+  "scope": "Example architecture artifacts for plugin validation",
+  "nodes": [
+    {
+      "id": "person.customer",
+      "type": "person",
+      "label": "Customer",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#customer"]
+    },
+    {
+      "id": "system.order-platform",
+      "type": "software-system",
+      "label": "Order Platform",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#orderSystem"]
+    },
+    {
+      "id": "container.web",
+      "type": "container",
+      "label": "Web App",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#web", "dependency-impact.dot#web_app"]
+    },
+    {
+      "id": "container.api",
+      "type": "container",
+      "label": "Order API",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#api", "dependency-impact.dot#order_api"]
+    },
+    {
+      "id": "container.orders-db",
+      "type": "database",
+      "label": "Orders Database",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#ordersDb", "dependency-impact.dot#orders_db"]
+    },
+    {
+      "id": "container.events",
+      "type": "message-bus",
+      "label": "Order Events",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#events", "business-flow.mmd#events"]
+    },
+    {
+      "id": "container.worker",
+      "type": "worker",
+      "label": "Fulfillment Worker",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#worker", "dependency-impact.dot#fulfillment_worker"]
+    },
+    {
+      "id": "external.payment",
+      "type": "external-system",
+      "label": "Payment Gateway",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#payment"]
+    },
+    {
+      "id": "external.warehouse",
+      "type": "external-system",
+      "label": "Warehouse System",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#warehouse"]
+    }
+  ],
+  "edges": [
+    {
+      "id": "customer-order-platform",
+      "from": "person.customer",
+      "to": "system.order-platform",
+      "type": "uses",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#customer"]
+    },
+    {
+      "id": "web-api",
+      "from": "container.web",
+      "to": "container.api",
+      "type": "runtime-call",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#web"]
+    },
+    {
+      "id": "api-db",
+      "from": "container.api",
+      "to": "container.orders-db",
+      "type": "data-access",
+      "confidence": "high",
+      "sourceRefs": ["system-context.structurizr.dsl#ordersDb", "dependency-impact.dot#orders_db"]
+    },
+    {
+      "id": "api-payment",
+      "from": "container.api",
+      "to": "external.payment",
+      "type": "runtime-call",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#payment", "business-flow.mmd#payment"]
+    },
+    {
+      "id": "api-events",
+      "from": "container.api",
+      "to": "container.events",
+      "type": "event-publish",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#events", "business-flow.mmd#events"]
+    },
+    {
+      "id": "worker-events",
+      "from": "container.worker",
+      "to": "container.events",
+      "type": "event-consume",
+      "confidence": "medium",
+      "sourceRefs": ["system-context.structurizr.dsl#worker", "dependency-impact.dot#order_events"]
+    },
+    {
+      "id": "worker-warehouse",
+      "from": "container.worker",
+      "to": "external.warehouse",
+      "type": "runtime-call",
+      "confidence": "low",
+      "sourceRefs": ["dependency-impact.dot#warehouse_system", "architecture-understanding.md#known-gaps"]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "client-ai",
+  "interface": {
+    "displayName": "Client AI"
+  },
+  "plugins": [
+    {
+      "name": "architecture-visualization",
+      "source": {
+        "source": "local",
+        "path": "./plugins/architecture-visualization"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    },
+    {
+      "name": "design-review",
+      "source": {
+        "source": "local",
+        "path": "./plugins/design-review"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Design"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "architecture-visualization",
+  "version": "0.1.0",
+  "description": "Model, review, evolve, and maintain evidence-backed software architecture.",
+  "author": {
+    "name": "Qoder"
+  },
+  "homepage": "https://qoder.com/",
+  "repository": "https://github.com/qoderai",
+  "keywords": [
+    "qoder-plugin",
+    "canvas",
+    "architecture",
+    "architecture-review",
+    "architecture-modeling",
+    "graphviz",
+    "dot",
+    "structurizr",
+    "c4"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Architecture",
+    "shortDescription": "Model and review evidence-backed software architecture",
+    "longDescription": "Use Architecture to understand current systems, flows, dependencies, runtime topology, risks, target states, and architecture health. Canvas format viewers are preserved from the original Qoder plugin for DOT, Structurizr DSL, and Mermaid artifacts.",
+    "developerName": "Qoder",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Map this repository's current architecture",
+      "Review architecture risks for this branch",
+      "Explain the runtime topology for this service"
+    ],
+    "brandColor": "#2563EB",
+    "composerIcon": "./assets/avatar.svg",
+    "logo": "./assets/avatar.svg",
+    "screenshots": []
+  }
+}

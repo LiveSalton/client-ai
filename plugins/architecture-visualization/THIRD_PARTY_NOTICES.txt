@@ -1,0 +1,16 @@
+THE FOLLOWING SETS FORTH ATTRIBUTION NOTICES FOR THIRD PARTY SOFTWARE OR PROJECTS THAT MAY BE REFERENCED BY PORTIONS OF THIS PRODUCT
+
+The following project may be referenced by this product for Structurizr DSL compatibility: Structurizr DSL
+This product does not bundle Structurizr source code, the Structurizr CLI, or Structurizr Java artifacts.
+Structurizr DSL is part of the Structurizr project and is licensed under the Apache License, Version 2.0.
+
+Project: Structurizr DSL
+Source: https://github.com/structurizr/java/tree/master/structurizr-dsl
+Archived source: https://github.com/structurizr/dsl
+License: Apache License, Version 2.0
+SPDX-License-Identifier: Apache-2.0
+License text: https://www.apache.org/licenses/LICENSE-2.0
+
+Structurizr is a trademark or project name of its respective owner. This viewer
+is not an official Structurizr product and does not imply endorsement by the
+Structurizr project.

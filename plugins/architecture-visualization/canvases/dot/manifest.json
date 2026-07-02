@@ -1,0 +1,6 @@
+{
+  "id": "dot",
+  "label": "Graphviz DOT",
+  "extensions": ["dot", "gv"],
+  "dataKey": "aicoding.formatViewer.dot"
+}

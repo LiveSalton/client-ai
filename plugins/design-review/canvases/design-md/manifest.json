@@ -1,0 +1,6 @@
+{
+  "id": "design-md",
+  "label": "DESIGN.md",
+  "pathGlobs": ["**/DESIGN.md"],
+  "dataKey": "aicoding.formatViewer.designMd"
+}

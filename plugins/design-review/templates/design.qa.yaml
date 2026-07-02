@@ -1,0 +1,116 @@
+project:
+  name: your-project
+  baseUrl: http://localhost:3000
+  outputDir: .design-qa
+  # Optional. If set, run-design-qa can start the app before screenshot capture.
+  # appCommand: npm run dev
+  # appReadyUrl: http://localhost:3000
+  # appReadyTimeoutMs: 60000
+
+design:
+  designMd: DESIGN.md
+  screenSpec: SCREEN_SPEC.md
+
+screens:
+  - name: home-desktop
+    mode: conformance # conformance | regression
+    expected:
+      type: image # image | figma
+      path: .design-qa/expected/home-desktop.png
+      # For Figma export, set type: figma and provide:
+      # figma:
+      #   fileKey: your_file_key
+      #   nodeId: "12:345"
+      #   format: png
+      #   scale: 1
+    app:
+      url: /
+      viewport:
+        width: 1440
+        height: 900
+      deviceScaleFactor: 1
+      fullPage: true
+      waitUntil: networkidle
+      waitForSelector: body
+      freezeDate: "2026-01-01T00:00:00Z"
+    compare:
+      maxDiffPixelRatio: 0.02
+      maxDiffPixels: 5000
+      threshold: 0.2
+      masks:
+        - selector: '[data-dynamic]'
+      ignoreSelectors:
+        - '[data-testid="timestamp"]'
+    # Optional. Inspect key DOM/computed-style anchors during UI alignment.
+    uiAlignment:
+      anchors:
+        - name: primary cta
+          selector: '[data-testid="primary-cta"]'
+          severity: major
+          expected:
+            minHeight: 44
+            height:
+              value: 48
+              tolerance: 1
+            css:
+              borderRadius: 12px
+              fontWeight: "600"
+
+uiAlignment:
+  runVisualComparison: true
+  runComponentAudit: true
+  runDebtAudit: true
+  runA11yAudit: false
+  measurementTolerancePx: 1
+  # Optional global anchors inspected on every configured screen.
+  anchors:
+    - name: page heading
+      selector: '[data-testid="page-heading"]'
+      expected:
+        css:
+          fontSize: 48px
+          lineHeight: 56px
+
+code:
+  include:
+    - src/**/*.{ts,tsx,js,jsx,css,scss,html,vue,svelte}
+    - app/**/*.{ts,tsx,js,jsx,css,scss,html,vue,svelte}
+    - pages/**/*.{ts,tsx,js,jsx,css,scss,html,vue,svelte}
+    - components/**/*.{ts,tsx,js,jsx,css,scss,html,vue,svelte}
+  exclude:
+    - node_modules/**
+    - dist/**
+    - build/**
+    - .next/**
+    - coverage/**
+    - .design-qa/**
+
+components:
+  libraryImportPatterns:
+    - '@/components/ui'
+    - '@/design-system'
+    - '@company/design-system'
+  rawElementPolicy:
+    button: prefer-design-system
+    input: prefer-design-system
+    select: prefer-design-system
+    textarea: prefer-design-system
+    dialog: prefer-design-system
+  allowedRawElementFiles:
+    - '**/design-system/**'
+    - '**/components/ui/**'
+
+a11y:
+  disabledRules: []
+  includeSelectors: []
+  excludeSelectors:
+    - '[data-a11y-ignore]'
+
+debt:
+  maxHardCodedColors: 0
+  maxArbitraryTailwindValues: 5
+  maxInlineStyles: 0
+  allowedColorValues:
+    - '#000'
+    - '#fff'
+    - transparent

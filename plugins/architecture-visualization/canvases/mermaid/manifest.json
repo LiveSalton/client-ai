@@ -1,0 +1,12 @@
+{
+  "id": "mermaid",
+  "label": "Mermaid",
+  "extensions": ["mmd", "mermaid"],
+  "pathGlobs": ["**/*.mmd", "**/*.mermaid"],
+  "contentProbe": {
+    "extensions": ["mmd", "mermaid"],
+    "prefixBytes": 32768,
+    "patterns": ["^\\s*(?:---[\\s\\S]*?---\\s*)?(?:graph|flowchart|stateDiagram(?:-v2)?|sequenceDiagram|classDiagram|erDiagram|xychart(?:-beta)?)\\b"]
+  },
+  "dataKey": "aicoding.formatViewer.mermaid"
+}

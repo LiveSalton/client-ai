@@ -1,0 +1,4 @@
+node_modules/
+.design-qa/
+.env
+.qoder/settings.local.json

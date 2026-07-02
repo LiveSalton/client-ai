@@ -138,31 +138,145 @@ Rules:
 4. Project-specific platform skills may be added only through an explicit project allowlist with an exact ID.
 5. A skill’s recommended action is skipped when `PROJECT_RULES`, `WRITE_GATE`, or `VALIDATION_POLICY` forbids it; record the skipped portion.
 
+### External Codex Plugin Routing
+
+`architecture-visualization` and `design-review` are external Codex plugins managed by `client-ai`. Use their original plugin skills directly. Do not wrap, rename, copy into `client-ai/skills`, or substitute them with local skills when the exact plugin skill is available.
+
+Expected installed skill IDs:
+
+- Architecture: `architecture-visualization:explore`, `architecture-visualization:system-modeler`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:architecture-communicator`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`.
+- Design: `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review`, `design-review:design-system-capture`, `design-review:responsive-design`, `design-review:ui-designer`.
+
+If a listed plugin skill is not present in `AVAILABLE_SKILLS`, report the capability gap and continue with the role contract only when the missing plugin skill is not essential. A plugin skill output is advice/evidence, not a project fact source; current repository facts and approved specs remain authoritative.
+
+Plugin ownership:
+
+| Plugin | Primary role | Supporting roles | Purpose |
+|---|---|---|---|
+| `architecture-visualization` | Coder, Reviewer | Product, Designer | Architecture understanding, flow visualization, change impact, topology, evolution, and architecture health. |
+| `design-review` | Designer, Reviewer | Coder | Design contracts, UI alignment, visual regression, accessibility, component consistency, responsive behavior, and design debt. |
+
+Role-to-plugin routing:
+
+| Role | Plugin | Allowed usage |
+|---|---|---|
+| Product | `architecture-visualization` | Clarify business/data flows, estimate scope and change impact, and shape acceptance criteria for cross-module work. |
+| Product | `design-review` | No default ownership. Product may read Designer/Reviewer outputs for acceptance, but should not run design checks as a substitute for Designer. |
+| Designer | `architecture-visualization` | Use flow and communication views to explain page flows, state flows, and technical constraints that affect UX. |
+| Designer | `design-review` | Own design-system capture, `DESIGN.md`, Design QA, UI alignment, responsive decisions, accessibility design constraints, and prototypes. |
+| Coder | `architecture-visualization` | Use system models, impact maps, flow maps, topology views, evolution plans, and graph artifacts before or during implementation. |
+| Coder | `design-review` | Use UI alignment, component-library, and responsive findings to implement design-conformant UI. |
+| Reviewer | `architecture-visualization` | Review architecture risk, health, impact, topology, and evolution evidence before `PASS`. |
+| Reviewer | `design-review` | Review Design QA, visual regression, accessibility, component usage, design debt, and `DESIGN.md` readiness before `PASS`. |
+
+### Main-Agent Orchestration Skills
+
+These skills are not owned by a child role. The main agent uses them before or between role gates.
+
+- `multi-agent-collaboration`: always the orchestration contract for repository tasks that affect behavior, UI/UX, code, configuration, resources, specifications, documentation, or validation evidence.
+- `agent-harness`: use when a project needs `AGENTS.md` and `doc/` collaboration documents created or refreshed.
+
 ### Product Allowlist
 
-- `before-you-build`: only for a new product, MVP, launch, agent workflow, or major feature with uncertain demand, positioning, monetization, retention, trust, distribution, or adoption. Do not use for narrow fixes or already validated changes.
+Product owns user value, scope, priority, specification shape, release intent, store-facing positioning, and final product acceptance.
+
+- `before-you-build`: only for a new product, MVP, launch, agent workflow, or major feature with uncertain demand, positioning, monetization, retention, trust, distribution, or adoption.
+- `openspec-explore`: use to clarify requirements, explore options, or investigate product questions before proposing or implementing a change.
+- `openspec-propose`: use to turn an approved product direction into OpenSpec proposal/design/spec/tasks artifacts.
+- `page-route-book`: use when Product needs page inventory, navigation map, screen ownership, or route-level product understanding.
+- `reverse-doc-skill`: use when Product needs product/technical documentation generated from the current codebase.
+- `app-store-optimization`: use for App Store / Google Play positioning, metadata, keywords, conversion, and store-performance work.
+- `project-release`: use for release scope, target channel, metadata, changelog, rollout, and final release acceptance.
+- `touch-release`: use with Product only to define release requirements and constraints; implementation and verification stay with Coder/Reviewer.
+- `architecture-visualization:explore`: use for broad architecture questions before committing a major feature scope.
+- `architecture-visualization:flow-visualizer`: use when product scope depends on business flow, state flow, service-call flow, or data-flow clarity.
+- `architecture-visualization:dependency-impact-analyzer`: use when priority, rollout size, or acceptance criteria depend on change impact across modules, pages, services, tests, data, or deployment.
 
 OpenSpec/opsx commands and connectors are project tools or fact sources unless an installed package exposes an exact Skill ID. Do not invent their names.
 
 ### Designer Allowlist
 
+Designer owns design source translation, visual system, interaction states, component mapping, UI acceptance criteria, and design-side QA.
+
 - `design-system-patterns`: use for token hierarchy, themes, component-library rules, component reuse, or design-to-code system foundations.
 - `interaction-design`: use for user actions, loading, disabled, selected, empty, error, success, cancellation, retry, recovery, transition, gesture, or feedback states.
-- `taste-quality-gate`: conditionally use for new visual design, redesign, first screen, onboarding, empty state, subscription/upgrade screen, brand surface, or an explicit request to reduce generic/template-like UI.
+- `taste-quality-gate`: use for new visual design, redesign, first screen, onboarding, empty state, subscription/upgrade screen, brand surface, or explicit anti-generic quality review.
+- `design-md`: use to analyze Stitch projects and synthesize semantic `DESIGN.md` files.
+- `stitch-design-taste`: use for premium Stitch visual-system constraints and anti-generic UI standards.
+- `stitch-ui-design`: use to write effective Stitch UI/UX prompts for mobile or web interfaces.
+- `ui-pixel-replication-by-wilder`: use for Figma, screenshot, or CSS-driven UI replication and pixel-level design constraints.
+- `architecture-visualization:flow-visualizer`: use to visualize page flows, interaction state flows, data movement, and failure/recovery paths that constrain UX decisions.
+- `architecture-visualization:architecture-communicator`: use to explain architecture constraints to product, design, engineering, or review audiences.
+- `design-review:design-system-capture`: use to capture or update design-system evidence from Figma, screenshots, tokens, CSS, component libraries, or existing UI.
+- `design-review:design-md-review`: use to author, review, or improve `DESIGN.md` as the design contract.
+- `design-review:design-qa`: use as the Designer-led design acceptance workflow across contract, visual, accessibility, component, and debt checks.
+- `design-review:ui-alignment-review`: use to compare implementation evidence against approved design references.
+- `design-review:responsive-design`: use for responsive/adaptive layout decisions.
+- `design-review:accessibility-review`: use when a design or implementation must satisfy keyboard, screen-reader, contrast, motion, touch-target, or WCAG-style checks.
+- `design-review:ui-designer`: use only for UI concepts, prototypes, or design-system exploration.
 
 Do not load `mobile-android-design` or any invented cross-platform replacement. Platform guidance must come from project facts or a separately approved exact skill.
 
+Do not use `design-review:ui-designer` to bypass Product scope or Coder ownership. Repository implementation remains under Coder after Product and Designer gates are `READY`.
+
 ### Coder Allowlist
 
-- `error-handling-patterns`: use when network, file, storage, permission, system API, billing, ads, parsing, async work, concurrency, or any user-visible failure path is in scope.
+Coder owns implementation, debugging, refactoring, architecture-fit execution, OpenSpec task application, release-pipeline changes, and project-specific API integration.
+
+- `code-up-by-wilder`: use as the coding-task router when implementing, modifying, refactoring, debugging, or reviewing which code skills should activate.
+- `coding-standards-by-wilder`: use while writing, reviewing, or refactoring app code against shared readability, naming, error-handling, testing, and structure standards.
+- `code-cleanup-by-wilder`: use to clean recently changed code while preserving behavior.
+- `refactor-cleaner-by-wilder`: use for conservative dead-code, duplicate-code, unused-export, or dependency cleanup.
+- `code-rewrite-similarity`: use for clean-room-style rewrites, similarity checks, and structural rewrite loops.
+- `error-handling-patterns`: use when network, file, storage, permission, system API, billing, ads, parsing, async work, concurrency, lifecycle, retry, or user-visible failure paths are in scope.
 - `systematic-debugging`: use for a bug, crash, test failure, build failure, performance problem, integration issue, or unexpected behavior before proposing a fix.
+- `openspec-apply-change`: use to implement approved OpenSpec tasks.
+- `android-reverse-engineering`: use for APK/XAPK/JAR/AAR decompilation, Android reverse engineering, endpoint extraction, or UI-to-network call tracing.
+- `social-gateway-api-sync`: use only for the `noviplay_cli` Android Social Gateway API sync workflow described by that skill.
+- `solution-architecture-by-wilder`: use when implementation needs architecture design, component boundaries, interfaces, data flow, or technical tradeoff decisions.
+- `project-release`: use to execute release workflow tasks such as versioning, metadata sync, artifacts, tracks, and rollout steps after Product defines intent.
+- `touch-release`: use to set up or modify mobile release pipeline, signing, Fastlane, CI, beta distribution, or versioning.
+- `architecture-visualization:system-modeler`: use to understand the current repository architecture before implementing cross-module work.
+- `architecture-visualization:dependency-impact-analyzer`: use before implementing changes that may affect modules, routes, APIs, tests, storage, permissions, build, or deployment.
+- `architecture-visualization:flow-visualizer`: use when implementation needs a precise business, data, service-call, or state-flow map.
+- `architecture-visualization:deployment-topology-analyzer`: use when implementation affects runtime environments, CI/CD, release topology, cloud resources, or operational boundaries.
+- `architecture-visualization:evolution-planner`: use for migration slices, modernization, architecture evolution, or target-state implementation planning.
+- `architecture-visualization:legacy-system-visualizer`: use when implementing changes in poorly documented legacy systems.
+- `architecture-visualization:c4model`: use to create maintainable C4 / Structurizr DSL architecture artifacts.
+- `architecture-visualization:graphviz`: use to create dense DOT dependency, flow, deployment, lineage, risk, or impact graphs.
+- `architecture-visualization:drawio`: use only when the user explicitly asks for Draw.io / diagrams.net editable delivery.
+- `design-review:ui-alignment-review`: use to interpret design-vs-implementation findings before UI fixes.
+- `design-review:component-library-alignment`: use when implementation must use existing design-system components or variants.
+- `design-review:responsive-design`: use when implementing adaptive layouts.
 
 Do not use the backend-focused `architecture-patterns` as a substitute for Android, iOS, or Flutter architecture. Existing repository architecture is authoritative.
 
 ### Reviewer Allowlist
 
+Reviewer owns independent review, evidence verification, regression risk, design QA evidence, architecture health, release validation, and final quality gate before Product acceptance.
+
 - `code-review-excellence`: use for code, configuration, resource, build, migration, or script diffs.
+- `code-reviewer-by-wilder`: use for merge-style review of regressions, security issues, maintainability risks, missing tests, or architecture drift.
 - `verification-before-completion`: use before `PASS`, `ACCEPTED`, commit/PR recommendations, or any completion claim.
+- `android_ui_verification`: use for Android emulator / ADB UI verification evidence.
+- `openspec-archive-change`: use to archive completed OpenSpec changes only after implementation and review are complete.
+- `coding-standards-by-wilder`: use as review criteria for naming, structure, testing, and maintainability.
+- `error-handling-patterns`: use to review user-visible failure paths and recovery behavior.
+- `reverse-doc-skill`: use to verify generated docs or detect documentation drift from the current codebase.
+- `app-store-optimization`: use to review ASO output, metadata quality, and store-facing risk.
+- `project-release`: use to verify release evidence, metadata, artifacts, tracks, rollout, and release records.
+- `touch-release`: use to verify mobile release pipeline, signing, Fastlane, CI, beta distribution, and versioning changes.
+- `architecture-visualization:risk-quality-reviewer`: use for architecture risk, quality attributes, technical debt, fitness functions, and remediation priority.
+- `architecture-visualization:architecture-health`: use to verify architecture artifacts are current, traceable, and aligned with code/config/runtime/ADR evidence.
+- `architecture-visualization:dependency-impact-analyzer`: use to check whether a diff changed more modules, tests, data, or deployment surfaces than claimed.
+- `architecture-visualization:deployment-topology-analyzer`: use to review runtime/deployment/release topology risks.
+- `architecture-visualization:evolution-planner`: use to review migration plans, target-state gaps, and architecture evolution slices.
+- `design-review:design-qa`: use for full design acceptance evidence review.
+- `design-review:visual-regression-review`: use for expected/actual/diff screenshot evidence.
+- `design-review:accessibility-review`: use for accessibility evidence and manual a11y review.
+- `design-review:component-library-alignment`: use to check design-system component usage.
+- `design-review:design-debt-review`: use to catch hard-coded values, token drift, one-off UI patterns, and visual maintainability risk.
+- `design-review:design-md-review`: use to review `DESIGN.md` completeness and implementation readiness.
 
 Do not use the browser-focused `e2e-testing-patterns` as a generic client-app test skill. Client user-path review is part of the Reviewer contract below. Add Espresso, XCUITest, Flutter integration-test, Patrol, or Maestro skills only when the project uses an exact approved skill.
 

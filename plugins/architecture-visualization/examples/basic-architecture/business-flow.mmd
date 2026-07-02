@@ -1,0 +1,18 @@
+flowchart TD
+  customer["Customer"]
+  web["Web App"]
+  api["Order API"]
+  payment["Payment Gateway"]
+  db[("Orders Database")]
+  events[["Order Events"]]
+  worker["Fulfillment Worker"]
+  warehouse["Warehouse System"]
+
+  customer -->|"Place order"| web
+  web -->|"POST /orders"| api
+  api -->|"Authorize payment"| payment
+  api -->|"Persist order"| db
+  api -->|"Publish OrderPlaced"| events
+  worker -->|"Consume OrderPlaced"| events
+  worker -->|"Update fulfillment status"| db
+  worker -.->|"Request fulfillment"| warehouse

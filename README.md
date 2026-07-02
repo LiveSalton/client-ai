@@ -1,6 +1,6 @@
 # client-ai
 
-`client-ai` 用于集中管理客户端研发场景下的 AI 辅助资产，当前沉淀为可复用的 `skills` 与 Codex custom agents。这些资产面向 Android 客户端、OpenSpec 流程、Stitch/UI 设计、代码质量治理、多 Agent 协作和文档反向梳理等工作流，便于在不同 AI 编码工具之间复用同一套规范。
+`client-ai` 用于集中管理客户端研发场景下的 AI 辅助资产，当前沉淀为可复用的 `skills`、Codex custom agents 与 Codex plugins。这些资产面向 Android 客户端、OpenSpec 流程、Stitch/UI 设计、代码质量治理、多 Agent 协作、架构可视化、设计评审和文档反向梳理等工作流，便于在不同 AI 编码工具之间复用同一套规范。
 
 > 当前仓库仍在整理中：已有内容以 `skills/` 和 `agents/codex/` 为主；`commands/`、`rules/` 已预留目录，但暂未放入可用文件。
 
@@ -8,10 +8,16 @@
 
 ```text
 client-ai/
+├── .agents/
+│   └── plugins/
+│       └── marketplace.json   # repo-local Codex plugin marketplace
 ├── agents/
 │   └── codex/               # Codex custom agents 配置
 ├── commands/                # 预留：命令模板或快捷指令
 ├── install-link-client-skills
+├── plugins/
+│   ├── architecture-visualization/
+│   └── design-review/
 ├── rules/                   # 预留：通用规则、项目规则或工具规则
 └── skills/
     ├── link-client-skills   # 将本仓库 skill 链接到目标 AI 工具目录的脚本
@@ -131,6 +137,58 @@ link-client-skills --agents all --skills all --dry-run
 
 脚本会在目标位置已存在普通文件、目录，或指向其他来源的符号链接时提示冲突路径；用户取消则停止，用户确认后才覆盖目标。
 
+### 3. Codex 插件市场
+
+`client-ai` 也维护 repo-local Codex plugin marketplace，用来分发原生 Codex 插件，而不是把插件内容复制成普通 skill。
+
+Marketplace 文件：
+
+```text
+/Users/salton/codeGit/client-ai/.agents/plugins/marketplace.json
+```
+
+当前插件：
+
+| Plugin | 来源 | 用途 |
+| --- | --- | --- |
+| `architecture-visualization` | Qoder `architecture-visualization` 转换为 Codex plugin | 架构建模、流程图、依赖影响、部署拓扑、演进计划、风险评审、架构健康检查 |
+| `design-review` | Qoder `design-review` 转换为 Codex plugin | 设计契约、UI 对齐、视觉回归、可访问性、组件库一致性、设计债、响应式评审 |
+
+首次安装到 Codex：
+
+```bash
+codex plugin marketplace add /Users/salton/codeGit/client-ai
+codex plugin add architecture-visualization@client-ai
+codex plugin add design-review@client-ai
+```
+
+安装后，多角色流程通过 `multi-agent-collaboration` 直接调用这些插件的原生 skill，例如：
+
+- `architecture-visualization:system-modeler`
+- `architecture-visualization:dependency-impact-analyzer`
+- `architecture-visualization:risk-quality-reviewer`
+- `design-review:design-qa`
+- `design-review:ui-alignment-review`
+- `design-review:accessibility-review`
+
+原则：插件能力保持插件形态；`client-ai/skills/multi-agent-collaboration` 只定义 Product、Designer、Coder、Reviewer 在什么场景下调用哪个原生 plugin skill。
+
+角色对应插件：
+
+| 角色 | 默认插件 | 使用边界 |
+| --- | --- | --- |
+| Product | `architecture-visualization` | 用于业务流、数据流、范围影响和验收标准判断；不主导设计评审插件 |
+| Designer | `design-review`, `architecture-visualization` | `design-review` 是主责插件；`architecture-visualization` 只用于页面流、状态流和架构约束表达 |
+| Coder | `architecture-visualization`, `design-review` | `architecture-visualization` 是实现前/实现中的架构理解插件；`design-review` 只用于按设计评审结果修 UI |
+| Reviewer | `architecture-visualization`, `design-review` | 两个插件都用于最终证据审核：架构风险/健康与设计 QA/视觉/a11y/设计债 |
+
+插件主责：
+
+| Plugin | 主责角色 | 协作角色 |
+| --- | --- | --- |
+| `architecture-visualization` | Coder, Reviewer | Product, Designer |
+| `design-review` | Designer, Reviewer | Coder |
+
 ## 已收录 Skills
 
 ### 项目协作与文档
@@ -219,12 +277,25 @@ link-client-skills --agents all --skills all --dry-run
 | `coder` | 在 Product/Designer 已确认范围内实现，不扩大范围，不绕过项目规则。 |
 | `reviewer` | 独立检查实际 diff、文档同步、验证证据、回归风险和交付结论。 |
 
+### 角色 Skill 分配
+
+`multi-agent-collaboration` 是完整路由源，这里只保留人类可快速扫描的摘要。当前只启用 Product、Designer、Coder、Reviewer 四个核心角色；架构、QA、发布、安全、数据能力先由四个核心角色按 skill 路由承担。
+
+| 角色 | 默认主责 Skill |
+| --- | --- |
+| Main Agent | `multi-agent-collaboration`, `agent-harness` |
+| Product | `before-you-build`, `openspec-explore`, `openspec-propose`, `page-route-book`, `reverse-doc-skill`, `app-store-optimization`, `project-release`, `touch-release`, `architecture-visualization:explore`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer` |
+| Designer | `design-system-patterns`, `interaction-design`, `taste-quality-gate`, `design-md`, `stitch-design-taste`, `stitch-ui-design`, `ui-pixel-replication-by-wilder`, `architecture-visualization:flow-visualizer`, `architecture-visualization:architecture-communicator`, `design-review:design-system-capture`, `design-review:design-md-review`, `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:responsive-design`, `design-review:accessibility-review`, `design-review:ui-designer` |
+| Coder | `code-up-by-wilder`, `coding-standards-by-wilder`, `code-cleanup-by-wilder`, `refactor-cleaner-by-wilder`, `code-rewrite-similarity`, `error-handling-patterns`, `systematic-debugging`, `openspec-apply-change`, `android-reverse-engineering`, `social-gateway-api-sync`, `solution-architecture-by-wilder`, `project-release`, `touch-release`, `architecture-visualization:system-modeler`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:flow-visualizer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:legacy-system-visualizer`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`, `design-review:ui-alignment-review`, `design-review:component-library-alignment`, `design-review:responsive-design` |
+| Reviewer | `code-review-excellence`, `code-reviewer-by-wilder`, `verification-before-completion`, `android_ui_verification`, `openspec-archive-change`, `coding-standards-by-wilder`, `error-handling-patterns`, `reverse-doc-skill`, `app-store-optimization`, `project-release`, `touch-release`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `design-review:design-qa`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review` |
+
 当前已具备：
 
 - 一组客户端研发相关 skill。
 - Stitch 与 UI 设计相关 skill。
 - OpenSpec 常用工作流 skill。
 - 多 Agent 协作 skill、角色方法 skill 和 Codex custom agents。
+- Codex plugin marketplace，以及 `architecture-visualization`、`design-review` 两个已转换插件。
 - 面向多 AI 工具的 skill 链接脚本。
 - 全局安装脚本 `install-link-client-skills`。
 
