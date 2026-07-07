@@ -1,0 +1,10 @@
+{
+  "variants": [
+    {
+      "name": "Example A",
+      "app_name": "Uninstaller App Cleaner",
+      "short_description": "Remove unused apps, back up APKs, and manage storage without root.",
+      "full_description": "Clean up your phone by finding unused apps, backing up APKs, and reviewing storage in one simple app.\n\nUse it to uninstall apps through the standard Android flow, keep local APK backups, and understand which apps take the most space.\n\nNo root required. Keep privacy and permission claims consistent with your actual implementation and Play Console declarations."
+    }
+  ]
+}

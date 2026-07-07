@@ -1,286 +1,309 @@
 ---
 name: multi-agent-collaboration
-description: Use at the start, resume, or scope change of any repository task that may affect product behavior, UI/UX, code, configuration, resources, specifications, documentation, or validation evidence; do not use for self-contained chat-only tasks with no repository or artifact impact.
+description: 当仓库任务可能影响产品行为、UI/UX、代码、配置、资源、规格、文档或验证证据时使用；纯聊天说明、翻译或改写且不影响仓库产物时不要使用。
 ---
 
-# Multi-Agent Collaboration
+# 多角色协作
 
-## Purpose
+## 目标
 
-Coordinate Product, Designer, Coder, and Reviewer as explicit role gates while preserving project instructions, OpenSpec/opsx, design facts, repository facts, write permissions, and validation policy.
+用 Product、Designer、Coder、Reviewer 四个核心角色管理客户端研发任务，确保每次变更都绑定项目规则、规格事实、设计事实、当前代码事实、写入权限和验证证据。
 
-This skill is the orchestration contract. Role skills provide methods only. No role skill may override project facts or this gate.
+这是编排契约。其他角色 skill、插件 skill 只能提供方法，不能覆盖本文件、项目规则或当前仓库事实。
 
-## Iron Law
+## 铁律
 
 ```text
-NO IMPLEMENTATION BEFORE ROLE SELECTION AND REQUIRED INPUT GATES.
-NO DELIVERY BEFORE REQUIRED REVIEW AND PRODUCT ACCEPTANCE.
+未完成角色选择和必要输入门禁前，不得实现。
+未完成必要审查和 Product 最终验收前，不得交付。
 ```
 
-Codex spawns subagents only when explicitly asked. After selecting roles, the main agent MUST explicitly spawn the selected custom agents (`product`, `designer`, `coder`, `reviewer`) or state that subagents are unavailable and execute the same role contracts serially without pretending separate agents ran.
+只有在用户明确要求时才派发 Codex custom agents。选定角色后，主 Agent 必须明确调用 `product`、`designer`、`coder`、`reviewer` 中被选中的 custom agents；如果当前环境不能派发子 Agent，必须说明，并由主 Agent 按同一角色契约串行执行，不能假装子 Agent 已运行。
 
-## Status Vocabulary
+## 状态词表
 
-Use only these workflow statuses:
+只能使用这些状态：
 
-- `READY`: the role completed its gate and the next required role may proceed.
-- `SKIPPED`: the role is not relevant; the reason is recorded.
-- `BLOCKED`: essential input, permission, fact, or evidence is missing or conflicting.
-- `REWORK`: implementation or design must be corrected before continuing.
-- `PASS`: Reviewer found no blocking issue and required validation evidence is sufficient.
-- `ACCEPTED`: Product confirmed the delivered result satisfies the agreed goal, scope, and acceptance criteria.
-- `REJECTED`: Product found an unmet product requirement or scope violation.
+- `READY`：角色门禁完成，下一个角色可以继续。
+- `SKIPPED`：该角色与本任务无关，已记录跳过理由。
+- `BLOCKED`：关键输入、权限、事实或证据缺失/冲突。
+- `REWORK`：实现或设计必须返工。
+- `PASS`：Reviewer 没有阻塞问题，且必要验证证据充分。
+- `ACCEPTED`：Product 确认交付结果满足目标、范围和验收标准。
+- `REJECTED`：Product 发现需求未满足或范围漂移。
 
-Do not use “conditional pass.” Outstanding mandatory work is `REWORK` or `BLOCKED`.
+不要使用“conditional pass”。如果仍有必须完成的工作，只能是 `REWORK` 或 `BLOCKED`。
 
-## Start Protocol
+## 启动协议
 
-Run this protocol at every new task, resumed task, or material scope change before planning or editing.
+每个新任务、恢复任务或实质性范围变化开始前，先执行本协议。
 
-### 1. Bind Project Facts
+### 1. 绑定项目事实
 
-Read all accessible authoritative sources and bind the following values:
+读取所有可访问的权威来源，并绑定这些值：
 
-| Variable | Required meaning |
+| 变量 | 含义 |
 |---|---|
-| `USER_GOAL` | The user’s latest explicit goal and correction. |
-| `PROJECT_RULES` | Active `AGENTS.md`, overrides, repository rules, coding standards, and directory-specific instructions. |
-| `WRITE_GATE` | Current sandbox, approval policy, protected paths, and write authorization. |
-| `SPEC_SOURCE` | OpenSpec/opsx, PRD, issue, RFC, ADR, approved plan, or other specification facts. |
-| `DESIGN_SOURCE` | `.stitch/DESIGN.md`, `.stitch/` rules, approved design, tokens, component library, screenshots, or equivalent design facts. |
-| `CURRENT_FACTS` | Current code, configuration, logs, repository status, diff, untracked files, and user-provided artifacts. |
-| `VALIDATION_POLICY` | Allowed and required tests, builds, linters, device checks, manual checks, and prohibited commands. |
-| `AVAILABLE_SKILLS` | Exact installed skill IDs visible in this session. |
+| `USER_GOAL` | 用户最新明确目标和最新纠正。 |
+| `PROJECT_RULES` | 当前 `AGENTS.md`、覆盖规则、仓库规则、编码规范、目录级指令。 |
+| `WRITE_GATE` | 当前沙箱、审批策略、保护路径、写入授权。 |
+| `SPEC_SOURCE` | OpenSpec/opsx、PRD、issue、RFC、ADR、已批准计划或其他规格事实。 |
+| `DESIGN_SOURCE` | `.stitch/DESIGN.md`、`.stitch/` 规则、设计稿、token、组件库、截图或等价设计事实。 |
+| `CURRENT_FACTS` | 当前代码、配置、日志、仓库状态、diff、未跟踪文件、用户提供材料。 |
+| `VALIDATION_POLICY` | 允许/必须运行的测试、构建、lint、设备检查、人工检查，以及禁止命令。 |
+| `AVAILABLE_SKILLS` | 当前会话可见的精确 skill ID。 |
 
-Mark each value `FOUND`, `MISSING`, `N/A`, or `CONFLICT`.
+每项标记为 `FOUND`、`MISSING`、`N/A` 或 `CONFLICT`。
 
-### 2. Resolve Precedence by Fact Type
+### 2. 按事实类型处理优先级
 
-Do not use one global priority list for every conflict.
+不要用一套全局优先级处理所有冲突。
 
-**Execution permission**
-
-```text
-runtime/sandbox restrictions
-> project write and validation gates
-> user authorization for this task
-> skill recommendations
-```
-
-**Product intent**
+执行权限：
 
 ```text
-user’s latest explicit goal/correction
-> current approved specification
-> older plans and historical notes
+运行时/沙箱限制
+> 项目写入和验证门禁
+> 用户对本任务的授权
+> skill 建议
 ```
 
-**Implementation facts**
+产品意图：
 
 ```text
-current code/config/diff/logs
-> current project documentation
-> reference projects
-> vendor skills and examples
-> agent inference
+用户最新明确目标/纠正
+> 当前已批准规格
+> 旧计划和历史记录
 ```
 
-A vendor skill is never a project fact source.
+实现事实：
 
-### 3. Handle Missing or Conflicting Inputs
+```text
+当前代码/配置/diff/日志
+> 当前项目文档
+> 参考项目
+> 插件 skill 或示例
+> Agent 推断
+```
 
-Read available sources before asking questions. Then apply this rule:
+插件 skill 不是项目事实来源。
 
-1. If the gap can change user-visible behavior, product scope, data source, design truth, write authorization, acceptance criteria, or completion evidence, set the responsible role to `BLOCKED` and ask a precise question.
-2. If the gap cannot change those outcomes and the repository has one clear existing precedent, reuse that precedent and record the evidence.
-3. “Common practice,” “probably,” and “similar name” are not evidence.
-4. Never invent data sources, design rules, commands, dependencies, or acceptance criteria.
+### 3. 处理缺失或冲突
 
-### 4. Select Roles
+先读可用来源，再决定是否提问。
 
-Use the smallest valid role set. Always record skipped roles and reasons.
+1. 如果缺口会影响用户可见行为、产品范围、数据来源、设计真相、写入授权、验收标准或完成证据，相关角色必须返回 `BLOCKED` 并提出精确问题。
+2. 如果缺口不会影响这些结果，且仓库有唯一清晰先例，可以复用该先例并记录证据。
+3. “常见做法”“大概”“名字像”都不是证据。
+4. 不得编造数据源、设计规则、命令、依赖或验收标准。
 
-| Task shape | Product | Designer | Coder | Reviewer |
+### 4. 选择角色
+
+使用最小有效角色集合。每个跳过角色都要记录证据化理由。
+
+| 任务形态 | Product | Designer | Coder | Reviewer |
 |---|---|---|---|---|
-| Chat-only explanation, translation, or rewrite with no repository/artifact impact | `SKIPPED` | `SKIPPED` | `SKIPPED` | `SKIPPED` |
-| Product scope, user flow, information architecture, or acceptance criteria only | `FULL` | only if UI/UX is affected | `SKIPPED` | only for material risk review |
-| UI/UX design without implementation | `FULL` or `CONFIRM` | required | `SKIPPED` | optional design compliance review |
-| UI/UX implementation | `FULL` or `CONFIRM` | required | required | required |
-| Non-UI feature implementation with approved specification | `CONFIRM` | `SKIPPED` | required | required |
-| Non-UI bug, build failure, or behavior regression | `CONFIRM` | only if user-visible UI behavior changes | required | required |
-| Review of an existing diff only | only if acceptance criteria are missing or disputed | only if design compliance is in scope | `SKIPPED` | required |
-| Purely mechanical formatting with provably no behavior, design, spec, or docs effect | `SKIPPED` | `SKIPPED` | main agent or Coder | follow project review policy |
+| 纯聊天说明、翻译、改写，不影响仓库或产物 | `SKIPPED` | `SKIPPED` | `SKIPPED` | `SKIPPED` |
+| 只涉及产品范围、用户流程、信息架构、验收标准 | `FULL` | UI/UX 受影响时需要 | `SKIPPED` | 有重大风险时需要 |
+| UI/UX 设计但不实现 | `FULL` 或 `CONFIRM` | 必须 | `SKIPPED` | 可选设计合规审查 |
+| UI/UX 实现 | `FULL` 或 `CONFIRM` | 必须 | 必须 | 必须 |
+| 非 UI 功能实现且已有批准规格 | `CONFIRM` | `SKIPPED` | 必须 | 必须 |
+| 非 UI bug、构建失败、行为回归 | `CONFIRM` | 用户可见 UI 行为变化时需要 | 必须 | 必须 |
+| 只审查已有 diff | 验收标准缺失/争议时需要 | 设计合规在范围内时需要 | `SKIPPED` | 必须 |
+| 纯机械格式化且可证明不影响行为、设计、规格、文档 | `SKIPPED` | `SKIPPED` | 主 Agent 或 Coder | 按项目审查策略 |
 
-`FULL` Product mode defines or changes goal, scope, flow, data source, and acceptance criteria. `CONFIRM` mode binds an already approved specification and prevents scope drift without rewriting a full PRD.
+`FULL` 表示 Product 定义或修改目标、范围、流程、数据源和验收标准。`CONFIRM` 表示绑定已批准规格，防止 Coder 自行扩大范围。
 
-### 5. Publish the Participation Declaration
+### 5. 发布参与声明
 
-Before role work begins, the main agent must state:
+角色工作开始前，主 Agent 必须说明：
 
-- selected roles and role mode;
-- skipped roles and evidence-based reason;
-- each role’s inputs;
-- each role’s required output;
-- each role’s completion standard;
-- current blockers;
-- selected exact skill IDs, if already known.
+- 选中的角色和角色模式。
+- 跳过的角色及证据化理由。
+- 每个角色的输入、输出和完成标准。
+- 当前阻塞项。
+- 已选用的精确 skill ID。
 
-## Exact Skill Routing
+## Skill 与插件路由
 
-Each role may select only the exact skills in its allowlist. Default maximum is two conditional skills per role per turn. Load fewer when one is sufficient.
+每个角色只能使用 allowlist 中的精确 skill ID。默认每个角色每轮最多加载两个条件性 skill；一个足够时不要加载两个。
 
-Rules:
+通用规则：
 
-1. No fuzzy matching, silent substitution, or “closest skill” fallback.
-2. If an exact skill is unavailable, report the capability gap and continue with the role contract when possible.
-3. Block only when the missing skill is essential and the role contract cannot safely supply the capability.
-4. Project-specific platform skills may be added only through an explicit project allowlist with an exact ID.
-5. A skill’s recommended action is skipped when `PROJECT_RULES`, `WRITE_GATE`, or `VALIDATION_POLICY` forbids it; record the skipped portion.
+1. 不得模糊匹配、静默替换或使用“最接近”的 skill。
+2. 精确 skill 不可用时，报告能力缺口；只有角色契约仍能安全覆盖时才继续。
+3. 缺失 skill 是必要能力时，必须 `BLOCKED`。
+4. 项目专用平台 skill 只能通过明确项目 allowlist 加入。
+5. 如果 skill 建议与 `PROJECT_RULES`、`WRITE_GATE` 或 `VALIDATION_POLICY` 冲突，跳过冲突部分并记录原因。
+6. 角色不得调用本角色 allowlist 之外的 skill；不能用“我只是辅助看一下”绕过角色边界。
+7. 当任务、用户措辞、文件类型或当前证据触发某个 skill 时，主 Agent 必须先把该 skill 映射到下方对应角色，再由该角色审查、执行或跟进；当前角色不拥有该 skill 时必须交接给拥有角色，不能代跑。
+8. 同一个 skill 出现在多个角色 allowlist 时，只能按本角色段落描述的边界使用：Product 定目标和验收，Designer 定设计事实和 UI 约束，Coder 执行实现，Reviewer 独立审查证据。
+9. `skills_used` 只能记录该角色实际读取并且属于该角色 allowlist 的精确 skill ID；禁止把其他角色读取或应该读取的 skill 写入自己的交接信封。
 
-### External Codex Plugin Routing
+### 角色 Skill 所有权
 
-`architecture-visualization` and `design-review` are external Codex plugins managed by `client-ai`. Use their original plugin skills directly. Do not wrap, rename, copy into `client-ai/skills`, or substitute them with local skills when the exact plugin skill is available.
+以这张表作为快速归属判断。更细触发条件以各角色 allowlist 条目为准。
 
-Expected installed skill IDs:
-
-- Architecture: `architecture-visualization:explore`, `architecture-visualization:system-modeler`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:architecture-communicator`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`.
-- Design: `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review`, `design-review:design-system-capture`, `design-review:responsive-design`, `design-review:ui-designer`.
-
-If a listed plugin skill is not present in `AVAILABLE_SKILLS`, report the capability gap and continue with the role contract only when the missing plugin skill is not essential. A plugin skill output is advice/evidence, not a project fact source; current repository facts and approved specs remain authoritative.
-
-Plugin ownership:
-
-| Plugin | Primary role | Supporting roles | Purpose |
-|---|---|---|---|
-| `architecture-visualization` | Coder, Reviewer | Product, Designer | Architecture understanding, flow visualization, change impact, topology, evolution, and architecture health. |
-| `design-review` | Designer, Reviewer | Coder | Design contracts, UI alignment, visual regression, accessibility, component consistency, responsive behavior, and design debt. |
-
-Role-to-plugin routing:
-
-| Role | Plugin | Allowed usage |
+| 归属 | Skill | 审查和跟进责任 |
 |---|---|---|
-| Product | `architecture-visualization` | Clarify business/data flows, estimate scope and change impact, and shape acceptance criteria for cross-module work. |
-| Product | `design-review` | No default ownership. Product may read Designer/Reviewer outputs for acceptance, but should not run design checks as a substitute for Designer. |
-| Designer | `architecture-visualization` | Use flow and communication views to explain page flows, state flows, and technical constraints that affect UX. |
-| Designer | `design-review` | Own design-system capture, `DESIGN.md`, Design QA, UI alignment, responsive decisions, accessibility design constraints, and prototypes. |
-| Coder | `architecture-visualization` | Use system models, impact maps, flow maps, topology views, evolution plans, and graph artifacts before or during implementation. |
-| Coder | `design-review` | Use UI alignment, component-library, and responsive findings to implement design-conformant UI. |
-| Reviewer | `architecture-visualization` | Review architecture risk, health, impact, topology, and evolution evidence before `PASS`. |
-| Reviewer | `design-review` | Review Design QA, visual regression, accessibility, component usage, design debt, and `DESIGN.md` readiness before `PASS`. |
+| Main Agent | `multi-agent-collaboration`, `agent-harness` | 主 Agent 负责启动、角色选择、项目事实绑定、harness 文档入口；子角色不得把这两个 skill 当作自己的业务能力。 |
+| Product | `before-you-build`, `openspec-explore`, `openspec-propose`, `page-route-book`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:explore`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer` | Product 负责产品目标、范围、用户流程、信息架构、发布意图、商店定位、ASO 策略、验收标准和最终产品验收。 |
+| Designer | `design-system-patterns`, `interaction-design`, `taste-quality-gate`, `design-md`, `stitch-design-taste`, `stitch-ui-design`, `ui-pixel-replication-by-wilder`, `architecture-visualization:flow-visualizer`, `architecture-visualization:architecture-communicator`, `design-review:design-system-capture`, `design-review:design-md-review`, `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:responsive-design`, `design-review:accessibility-review`, `design-review:ui-designer` | Designer 负责设计源、设计系统、组件/token/资源映射、交互状态、视觉质量、响应式、a11y 设计约束和设计侧 QA。 |
+| Coder | `code-up-by-wilder`, `coding-standards-by-wilder`, `code-cleanup-by-wilder`, `refactor-cleaner-by-wilder`, `code-rewrite-similarity`, `error-handling-patterns`, `systematic-debugging`, `openspec-apply-change`, `android-reverse-engineering`, `social-gateway-api-sync`, `solution-architecture-by-wilder`, `project-release`, `touch-release`, `architecture-visualization:system-modeler`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:flow-visualizer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:legacy-system-visualizer`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`, `design-review:ui-alignment-review`, `design-review:component-library-alignment`, `design-review:responsive-design` | Coder 负责在 Product/Designer READY 或 SKIPPED 后执行代码、调试、重构、OpenSpec task、发布实现、逆向分析和项目专项 API 同步。 |
+| Reviewer | `code-review-excellence`, `code-reviewer-by-wilder`, `verification-before-completion`, `android_ui_verification`, `openspec-archive-change`, `coding-standards-by-wilder`, `error-handling-patterns`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `design-review:design-qa`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review` | Reviewer 负责只读独立审查真实 diff、设计/规格符合度、验证证据、发布证据、ASO 输出质量、架构健康和回归风险。 |
 
-### Main-Agent Orchestration Skills
+### 跨角色交接规则
 
-These skills are not owned by a child role. The main agent uses them before or between role gates.
+- Product 触发的 scope、OpenSpec、ASO、发布目标或验收标准问题，必须由 Product 先 `READY` 或 `BLOCKED`；Coder 不能先实现，Reviewer 不能替 Product 定范围。
+- Designer 触发的设计系统、Stitch、像素复刻、UI 对齐、响应式或 a11y 设计问题，必须由 Designer 先 `READY` 或 `BLOCKED`；Coder 不能猜设计，Reviewer 不能替 Designer 做新设计决策。
+- Coder 触发的实现、调试、重构、逆向、发布执行或架构产物生成问题，必须由 Coder 跟进；Reviewer 发现问题后返回 `REWORK`，不能直接修。
+- Reviewer 触发的代码审查、设计 QA、视觉回归、a11y 审查、架构健康、发布验证或完成验证问题，必须由 Reviewer 独立审查；Product/Designer/Coder 的自评不能替代 Reviewer。
+- 共享 skill 必须按动作归属：定义/验收归 Product，设计/约束归 Designer，实施/修复归 Coder，审查/验证归 Reviewer。
+- 如果一个角色发现需要其他角色 skill，当前角色输出 `handoff_to` 指向对应角色，并说明触发证据、所需 skill、待审查问题和阻塞条件。
 
-- `multi-agent-collaboration`: always the orchestration contract for repository tasks that affect behavior, UI/UX, code, configuration, resources, specifications, documentation, or validation evidence.
-- `agent-harness`: use when a project needs `AGENTS.md` and `doc/` collaboration documents created or refreshed.
+### 外部 Codex 插件
 
-### Product Allowlist
+`architecture-visualization` 和 `design-review` 是由 `client-ai` 管理的外部 Codex 插件。必须直接使用插件原生 skill，不要包装、重命名、复制到 `client-ai/skills`，也不要在插件 skill 可用时用本地 skill 替代。
 
-Product owns user value, scope, priority, specification shape, release intent, store-facing positioning, and final product acceptance.
+预期插件 skill ID：
 
-- `before-you-build`: only for a new product, MVP, launch, agent workflow, or major feature with uncertain demand, positioning, monetization, retention, trust, distribution, or adoption.
-- `openspec-explore`: use to clarify requirements, explore options, or investigate product questions before proposing or implementing a change.
-- `openspec-propose`: use to turn an approved product direction into OpenSpec proposal/design/spec/tasks artifacts.
-- `page-route-book`: use when Product needs page inventory, navigation map, screen ownership, or route-level product understanding.
-- `reverse-doc-skill`: use when Product needs product/technical documentation generated from the current codebase.
-- `app-store-optimization`: use for App Store / Google Play positioning, metadata, keywords, conversion, and store-performance work.
-- `project-release`: use for release scope, target channel, metadata, changelog, rollout, and final release acceptance.
-- `touch-release`: use with Product only to define release requirements and constraints; implementation and verification stay with Coder/Reviewer.
-- `architecture-visualization:explore`: use for broad architecture questions before committing a major feature scope.
-- `architecture-visualization:flow-visualizer`: use when product scope depends on business flow, state flow, service-call flow, or data-flow clarity.
-- `architecture-visualization:dependency-impact-analyzer`: use when priority, rollout size, or acceptance criteria depend on change impact across modules, pages, services, tests, data, or deployment.
+- 架构插件：`architecture-visualization:explore`、`architecture-visualization:system-modeler`、`architecture-visualization:flow-visualizer`、`architecture-visualization:dependency-impact-analyzer`、`architecture-visualization:deployment-topology-analyzer`、`architecture-visualization:evolution-planner`、`architecture-visualization:risk-quality-reviewer`、`architecture-visualization:architecture-health`、`architecture-visualization:architecture-communicator`、`architecture-visualization:c4model`、`architecture-visualization:graphviz`、`architecture-visualization:drawio`。
+- 设计插件：`design-review:design-qa`、`design-review:ui-alignment-review`、`design-review:visual-regression-review`、`design-review:accessibility-review`、`design-review:component-library-alignment`、`design-review:design-debt-review`、`design-review:design-md-review`、`design-review:design-system-capture`、`design-review:responsive-design`、`design-review:ui-designer`。
 
-OpenSpec/opsx commands and connectors are project tools or fact sources unless an installed package exposes an exact Skill ID. Do not invent their names.
+插件归属：
 
-### Designer Allowlist
+| 插件 | 主责角色 | 协作角色 | 用途 |
+|---|---|---|---|
+| `architecture-visualization` | Coder、Reviewer | Product、Designer | 架构理解、流程可视化、变更影响、部署拓扑、演进规划、架构健康。 |
+| `design-review` | Designer、Reviewer | Coder | 设计契约、UI 对齐、视觉回归、可访问性、组件一致性、响应式、设计债。 |
 
-Designer owns design source translation, visual system, interaction states, component mapping, UI acceptance criteria, and design-side QA.
+角色到插件的路由：
 
-- `design-system-patterns`: use for token hierarchy, themes, component-library rules, component reuse, or design-to-code system foundations.
-- `interaction-design`: use for user actions, loading, disabled, selected, empty, error, success, cancellation, retry, recovery, transition, gesture, or feedback states.
-- `taste-quality-gate`: use for new visual design, redesign, first screen, onboarding, empty state, subscription/upgrade screen, brand surface, or explicit anti-generic quality review.
-- `design-md`: use to analyze Stitch projects and synthesize semantic `DESIGN.md` files.
-- `stitch-design-taste`: use for premium Stitch visual-system constraints and anti-generic UI standards.
-- `stitch-ui-design`: use to write effective Stitch UI/UX prompts for mobile or web interfaces.
-- `ui-pixel-replication-by-wilder`: use for Figma, screenshot, or CSS-driven UI replication and pixel-level design constraints.
-- `architecture-visualization:flow-visualizer`: use to visualize page flows, interaction state flows, data movement, and failure/recovery paths that constrain UX decisions.
-- `architecture-visualization:architecture-communicator`: use to explain architecture constraints to product, design, engineering, or review audiences.
-- `design-review:design-system-capture`: use to capture or update design-system evidence from Figma, screenshots, tokens, CSS, component libraries, or existing UI.
-- `design-review:design-md-review`: use to author, review, or improve `DESIGN.md` as the design contract.
-- `design-review:design-qa`: use as the Designer-led design acceptance workflow across contract, visual, accessibility, component, and debt checks.
-- `design-review:ui-alignment-review`: use to compare implementation evidence against approved design references.
-- `design-review:responsive-design`: use for responsive/adaptive layout decisions.
-- `design-review:accessibility-review`: use when a design or implementation must satisfy keyboard, screen-reader, contrast, motion, touch-target, or WCAG-style checks.
-- `design-review:ui-designer`: use only for UI concepts, prototypes, or design-system exploration.
+| 角色 | 插件 | 使用边界 |
+|---|---|---|
+| Product | `architecture-visualization` | 澄清业务/数据流、评估范围和影响、辅助验收标准。 |
+| Product | `design-review` | 默认不主导；只读取 Designer/Reviewer 输出用于最终验收。 |
+| Designer | `architecture-visualization` | 表达页面流、状态流、数据移动和影响 UX 的架构约束。 |
+| Designer | `design-review` | 主责设计系统捕获、`DESIGN.md`、Design QA、UI 对齐、响应式、可访问性设计约束和原型。 |
+| Coder | `architecture-visualization` | 实现前/实现中理解系统、影响面、拓扑、演进和图源。 |
+| Coder | `design-review` | 根据 UI 对齐、组件库、响应式结果修复实现。 |
+| Reviewer | `architecture-visualization` | 审查架构风险、健康、影响、拓扑和演进证据。 |
+| Reviewer | `design-review` | 审查 Design QA、视觉回归、可访问性、组件使用、设计债和 `DESIGN.md` 就绪度。 |
 
-Do not load `mobile-android-design` or any invented cross-platform replacement. Platform guidance must come from project facts or a separately approved exact skill.
+## 主 Agent 编排类 Skill
 
-Do not use `design-review:ui-designer` to bypass Product scope or Coder ownership. Repository implementation remains under Coder after Product and Designer gates are `READY`.
+这些 skill 不归属于子角色，由主 Agent 在角色门禁前或门禁之间使用。
 
-### Coder Allowlist
+- `multi-agent-collaboration`：影响行为、UI/UX、代码、配置、资源、规格、文档或验证证据的仓库任务，都使用它作为编排契约。
+- `agent-harness`：项目需要创建或刷新 `AGENTS.md` 与 `doc/` 协作文档体系时使用。
 
-Coder owns implementation, debugging, refactoring, architecture-fit execution, OpenSpec task application, release-pipeline changes, and project-specific API integration.
+## Product 可调用 Skill
 
-- `code-up-by-wilder`: use as the coding-task router when implementing, modifying, refactoring, debugging, or reviewing which code skills should activate.
-- `coding-standards-by-wilder`: use while writing, reviewing, or refactoring app code against shared readability, naming, error-handling, testing, and structure standards.
-- `code-cleanup-by-wilder`: use to clean recently changed code while preserving behavior.
-- `refactor-cleaner-by-wilder`: use for conservative dead-code, duplicate-code, unused-export, or dependency cleanup.
-- `code-rewrite-similarity`: use for clean-room-style rewrites, similarity checks, and structural rewrite loops.
-- `error-handling-patterns`: use when network, file, storage, permission, system API, billing, ads, parsing, async work, concurrency, lifecycle, retry, or user-visible failure paths are in scope.
-- `systematic-debugging`: use for a bug, crash, test failure, build failure, performance problem, integration issue, or unexpected behavior before proposing a fix.
-- `openspec-apply-change`: use to implement approved OpenSpec tasks.
-- `android-reverse-engineering`: use for APK/XAPK/JAR/AAR decompilation, Android reverse engineering, endpoint extraction, or UI-to-network call tracing.
-- `social-gateway-api-sync`: use only for the `noviplay_cli` Android Social Gateway API sync workflow described by that skill.
-- `solution-architecture-by-wilder`: use when implementation needs architecture design, component boundaries, interfaces, data flow, or technical tradeoff decisions.
-- `project-release`: use to execute release workflow tasks such as versioning, metadata sync, artifacts, tracks, and rollout steps after Product defines intent.
-- `touch-release`: use to set up or modify mobile release pipeline, signing, Fastlane, CI, beta distribution, or versioning.
-- `architecture-visualization:system-modeler`: use to understand the current repository architecture before implementing cross-module work.
-- `architecture-visualization:dependency-impact-analyzer`: use before implementing changes that may affect modules, routes, APIs, tests, storage, permissions, build, or deployment.
-- `architecture-visualization:flow-visualizer`: use when implementation needs a precise business, data, service-call, or state-flow map.
-- `architecture-visualization:deployment-topology-analyzer`: use when implementation affects runtime environments, CI/CD, release topology, cloud resources, or operational boundaries.
-- `architecture-visualization:evolution-planner`: use for migration slices, modernization, architecture evolution, or target-state implementation planning.
-- `architecture-visualization:legacy-system-visualizer`: use when implementing changes in poorly documented legacy systems.
-- `architecture-visualization:c4model`: use to create maintainable C4 / Structurizr DSL architecture artifacts.
-- `architecture-visualization:graphviz`: use to create dense DOT dependency, flow, deployment, lineage, risk, or impact graphs.
-- `architecture-visualization:drawio`: use only when the user explicitly asks for Draw.io / diagrams.net editable delivery.
-- `design-review:ui-alignment-review`: use to interpret design-vs-implementation findings before UI fixes.
-- `design-review:component-library-alignment`: use when implementation must use existing design-system components or variants.
-- `design-review:responsive-design`: use when implementing adaptive layouts.
+Product 负责用户价值、范围、优先级、规格形态、发布意图、商店定位和最终产品验收。
 
-Do not use the backend-focused `architecture-patterns` as a substitute for Android, iOS, or Flutter architecture. Existing repository architecture is authoritative.
+- `before-you-build`：新产品、MVP、上线、Agent 工作流或重大功能存在需求、定位、商业化、留存、信任、分发、采用风险时使用。
+- `openspec-explore`：实现前澄清需求、探索方案或调查产品问题时使用。
+- `openspec-propose`：把已批准方向生成 OpenSpec proposal/design/spec/tasks 时使用。
+- `page-route-book`：需要页面清单、导航地图、页面归属或路由级产品理解时使用。
+- `reverse-doc-skill`：需要从当前代码生成产品/技术文档时使用。
+- `app-store-optimization`：处理 App Store / Google Play 定位、metadata、关键词、转化和商店表现时使用。
+- `google-play-aso-stack`：处理 Google Play listing 审计、关键词、metadata、截图、icon、Store Listing Experiments、本地化、评分和增长衡量时使用。
+- `project-release`：定义发布范围、目标渠道、metadata、changelog、rollout 和最终发布验收时使用。
+- `touch-release`：仅用于定义发布需求和约束；实现和验证归 Coder/Reviewer。
+- `architecture-visualization:explore`：重大功能定范围前需要广义架构判断时使用。
+- `architecture-visualization:flow-visualizer`：产品范围依赖业务流、状态流、调用流或数据流时使用。
+- `architecture-visualization:dependency-impact-analyzer`：优先级、发布范围或验收标准依赖跨模块/页面/服务/测试/数据/部署影响时使用。
 
-### Reviewer Allowlist
+OpenSpec/opsx 命令和连接器是项目工具或事实来源；除非当前环境暴露了精确 skill ID，否则不要发明 skill 名称。
 
-Reviewer owns independent review, evidence verification, regression risk, design QA evidence, architecture health, release validation, and final quality gate before Product acceptance.
+## Designer 可调用 Skill
 
-- `code-review-excellence`: use for code, configuration, resource, build, migration, or script diffs.
-- `code-reviewer-by-wilder`: use for merge-style review of regressions, security issues, maintainability risks, missing tests, or architecture drift.
-- `verification-before-completion`: use before `PASS`, `ACCEPTED`, commit/PR recommendations, or any completion claim.
-- `android_ui_verification`: use for Android emulator / ADB UI verification evidence.
-- `openspec-archive-change`: use to archive completed OpenSpec changes only after implementation and review are complete.
-- `coding-standards-by-wilder`: use as review criteria for naming, structure, testing, and maintainability.
-- `error-handling-patterns`: use to review user-visible failure paths and recovery behavior.
-- `reverse-doc-skill`: use to verify generated docs or detect documentation drift from the current codebase.
-- `app-store-optimization`: use to review ASO output, metadata quality, and store-facing risk.
-- `project-release`: use to verify release evidence, metadata, artifacts, tracks, rollout, and release records.
-- `touch-release`: use to verify mobile release pipeline, signing, Fastlane, CI, beta distribution, and versioning changes.
-- `architecture-visualization:risk-quality-reviewer`: use for architecture risk, quality attributes, technical debt, fitness functions, and remediation priority.
-- `architecture-visualization:architecture-health`: use to verify architecture artifacts are current, traceable, and aligned with code/config/runtime/ADR evidence.
-- `architecture-visualization:dependency-impact-analyzer`: use to check whether a diff changed more modules, tests, data, or deployment surfaces than claimed.
-- `architecture-visualization:deployment-topology-analyzer`: use to review runtime/deployment/release topology risks.
-- `architecture-visualization:evolution-planner`: use to review migration plans, target-state gaps, and architecture evolution slices.
-- `design-review:design-qa`: use for full design acceptance evidence review.
-- `design-review:visual-regression-review`: use for expected/actual/diff screenshot evidence.
-- `design-review:accessibility-review`: use for accessibility evidence and manual a11y review.
-- `design-review:component-library-alignment`: use to check design-system component usage.
-- `design-review:design-debt-review`: use to catch hard-coded values, token drift, one-off UI patterns, and visual maintainability risk.
-- `design-review:design-md-review`: use to review `DESIGN.md` completeness and implementation readiness.
+Designer 负责设计源转译、视觉系统、交互状态、组件映射、UI 验收标准和设计侧 QA。
 
-Do not use the browser-focused `e2e-testing-patterns` as a generic client-app test skill. Client user-path review is part of the Reviewer contract below. Add Espresso, XCUITest, Flutter integration-test, Patrol, or Maestro skills only when the project uses an exact approved skill.
+- `design-system-patterns`：token 层级、主题、组件库规则、组件复用或设计到代码系统基础变化时使用。
+- `interaction-design`：用户动作、加载、禁用、选中、空、错、成功、取消、重试、恢复、转场、手势或反馈状态在范围内时使用。
+- `taste-quality-gate`：新视觉、改版、首屏、onboarding、空状态、订阅/升级、品牌表面或反模板化视觉质量检查时使用。
+- `design-md`：分析 Stitch 项目并生成语义化 `DESIGN.md` 时使用。
+- `stitch-design-taste`：为 Stitch 生成高质量视觉系统约束和反模板化 UI 标准时使用。
+- `stitch-ui-design`：编写 Stitch 移动端或 Web UI/UX prompt 时使用。
+- `ui-pixel-replication-by-wilder`：基于 Figma、截图或 CSS 做 UI 像素复刻和像素级设计约束时使用。
+- `architecture-visualization:flow-visualizer`：需要可视化页面流、交互状态流、数据移动、失败/恢复路径以约束 UX 决策时使用。
+- `architecture-visualization:architecture-communicator`：需要向产品、设计、工程或评审解释架构约束时使用。
+- `design-review:design-system-capture`：从 Figma、截图、token、CSS、组件库或现有 UI 捕获/更新设计系统证据时使用。
+- `design-review:design-md-review`：编写、审查或改进 `DESIGN.md` 设计契约时使用。
+- `design-review:design-qa`：Designer 主导设计验收，覆盖契约、视觉、可访问性、组件和设计债时使用。
+- `design-review:ui-alignment-review`：对比实现证据与批准设计参考时使用。
+- `design-review:responsive-design`：响应式/自适应布局决策时使用。
+- `design-review:accessibility-review`：设计或实现需要满足键盘、读屏、对比度、动效、触控目标或 WCAG 风格检查时使用。
+- `design-review:ui-designer`：只用于 UI 概念、原型或设计系统探索。
 
-## Workflow State Machine
+不要加载 `mobile-android-design` 或发明跨平台替代 skill。平台指导必须来自项目事实或明确批准的精确 skill。
+
+不要用 `design-review:ui-designer` 绕过 Product 范围或 Coder 所有权。仓库实现必须在 Product 和 Designer `READY` 后交给 Coder。
+
+## Coder 可调用 Skill
+
+Coder 负责实现、调试、重构、架构适配执行、OpenSpec task 执行、发布流水线改动和项目特定 API 集成。
+
+- `code-up-by-wilder`：编码任务路由；用于决定实现、修改、重构、调试或审查时应启用哪些代码类 skill。
+- `coding-standards-by-wilder`：编写、审查或重构应用代码时，按共享可读性、命名、错误处理、测试和结构标准使用。
+- `code-cleanup-by-wilder`：保持行为不变，清理最近改动代码时使用。
+- `refactor-cleaner-by-wilder`：保守删除死代码、重复代码、未使用导出或依赖时使用。
+- `code-rewrite-similarity`：clean-room 风格重写、相似度检查和结构重写循环时使用。
+- `error-handling-patterns`：网络、文件、存储、权限、系统 API、计费、广告、解析、异步、并发、生命周期、重试或用户可见失败路径在范围内时使用。
+- `systematic-debugging`：bug、崩溃、测试失败、构建失败、性能问题、集成问题或异常行为修复前使用。
+- `openspec-apply-change`：执行已批准 OpenSpec tasks 时使用。
+- `android-reverse-engineering`：APK/XAPK/JAR/AAR 反编译、Android 逆向、接口提取、UI 到网络调用链追踪时使用。
+- `social-gateway-api-sync`：只用于该 skill 定义的 `noviplay_cli` Android Social Gateway API 同步工作流。
+- `solution-architecture-by-wilder`：实现需要架构设计、组件边界、接口、数据流或技术权衡时使用。
+- `project-release`：Product 定义发布意图后，执行版本、metadata、产物、测试轨道、rollout 等发布任务时使用。
+- `touch-release`：设置或修改移动端发布流水线、签名、Fastlane、CI、beta 分发或版本号时使用。
+- `architecture-visualization:system-modeler`：跨模块实现前理解当前仓库架构时使用。
+- `architecture-visualization:dependency-impact-analyzer`：改动可能影响模块、路由、API、测试、存储、权限、构建或部署前使用。
+- `architecture-visualization:flow-visualizer`：实现需要精确业务流、数据流、调用流或状态流时使用。
+- `architecture-visualization:deployment-topology-analyzer`：实现影响运行环境、CI/CD、发布拓扑、云资源或运维边界时使用。
+- `architecture-visualization:evolution-planner`：迁移切片、现代化、架构演进或目标态实现规划时使用。
+- `architecture-visualization:legacy-system-visualizer`：在文档不足的 legacy 系统中实现变更时使用。
+- `architecture-visualization:c4model`：创建可维护 C4 / Structurizr DSL 架构产物时使用。
+- `architecture-visualization:graphviz`：创建复杂 DOT 依赖、流程、部署、血缘、风险或影响图时使用。
+- `architecture-visualization:drawio`：只有用户明确要求 Draw.io / diagrams.net 可编辑交付时使用。
+- `design-review:ui-alignment-review`：修 UI 前解释设计与实现偏差时使用。
+- `design-review:component-library-alignment`：实现必须使用现有设计系统组件或变体时使用。
+- `design-review:responsive-design`：实现自适应布局时使用。
+
+不要用后端导向的 `architecture-patterns` 替代 Android、iOS 或 Flutter 架构判断。当前仓库架构才是权威。
+
+## Reviewer 可调用 Skill
+
+Reviewer 负责独立审查、证据验证、回归风险、设计 QA 证据、架构健康、发布验证，以及 Product 验收前的最终质量门禁。
+
+- `code-review-excellence`：审查代码、配置、资源、构建、迁移或脚本 diff 时使用。
+- `code-reviewer-by-wilder`：合并前审查回归、安全、可维护性、缺失测试或架构偏移时使用。
+- `verification-before-completion`：声明 `PASS`、`ACCEPTED`、可提交、可 PR 或可交付前使用。
+- `android_ui_verification`：需要 Android Emulator / ADB UI 验证证据时使用。
+- `openspec-archive-change`：实现和审查完成后归档 OpenSpec change 时使用。
+- `coding-standards-by-wilder`：作为命名、结构、测试、可维护性审查标准时使用。
+- `error-handling-patterns`：审查用户可见失败路径和恢复行为时使用。
+- `reverse-doc-skill`：验证生成文档或检查文档与当前代码漂移时使用。
+- `app-store-optimization`：审查 ASO 输出、metadata 质量和商店侧风险时使用。
+- `google-play-aso-stack`：审查 Google Play ASO 方案、metadata、创意资产计划、实验队列、本地化、评分策略和衡量方案的证据质量时使用。
+- `project-release`：验证发布证据、metadata、产物、测试轨道、rollout 和发布记录时使用。
+- `touch-release`：验证移动端发布流水线、签名、Fastlane、CI、beta 分发和版本号变更时使用。
+- `architecture-visualization:risk-quality-reviewer`：审查架构风险、质量属性、技术债、适应性函数和修复优先级时使用。
+- `architecture-visualization:architecture-health`：验证架构产物是否与代码、配置、运行时、ADR 证据保持当前和可追溯时使用。
+- `architecture-visualization:dependency-impact-analyzer`：检查 diff 是否影响了声明之外的模块、测试、数据或部署面时使用。
+- `architecture-visualization:deployment-topology-analyzer`：审查运行、部署、发布拓扑风险时使用。
+- `architecture-visualization:evolution-planner`：审查迁移计划、目标态缺口和架构演进切片时使用。
+- `design-review:design-qa`：完整审查设计验收证据时使用。
+- `design-review:visual-regression-review`：审查 expected/actual/diff 截图证据时使用。
+- `design-review:accessibility-review`：审查可访问性证据和人工 a11y 判断时使用。
+- `design-review:component-library-alignment`：检查设计系统组件使用时使用。
+- `design-review:design-debt-review`：发现硬编码值、token 漂移、一次性 UI 模式和视觉维护风险时使用。
+- `design-review:design-md-review`：审查 `DESIGN.md` 完整性和实现就绪度时使用。
+
+不要用浏览器导向的 `e2e-testing-patterns` 作为通用客户端测试 skill。客户端用户路径审查属于 Reviewer 契约。只有项目明确使用 Espresso、XCUITest、Flutter integration-test、Patrol 或 Maestro 的精确 skill 时，才加入项目 allowlist。
+
+## 工作流状态机
 
 ```text
 INTAKE
@@ -306,171 +329,155 @@ PRODUCT_ACCEPTED or PRODUCT_FINAL_SKIPPED
   -> MAIN_AGENT_DELIVERY
 ```
 
-Coder may start only after Product is `READY` or explicitly `SKIPPED`, and Designer is `READY` or explicitly `SKIPPED`. Reviewer starts only after implementation or reviewable artifacts exist. No child role delivers directly to the user.
+Coder 只能在 Product `READY` 或明确 `SKIPPED`，且 Designer `READY` 或明确 `SKIPPED` 后开始。Reviewer 只能在已有实现或可审查产物后开始。任何子角色都不能直接向用户交付最终结论。
 
-## Product Contract
+## Product 契约
 
-### Responsibility
+Product 负责澄清用户价值、目标、范围、非目标、用户流程、信息架构、数据源、产品风险和可测试验收标准，并在 Reviewer `PASS` 后做最终产品验收。
 
-Clarify user value, goal, scope, non-goals, user flow, information architecture, data source, product risk, and testable acceptance criteria. Perform final product acceptance after review.
+Product 不编辑代码、不决定视觉细节、不批准代码质量。
 
-Product does not edit code, decide visual details, or approve code quality.
+输入：
 
-### Required Input
+- `USER_GOAL`、`PROJECT_RULES`、`SPEC_SOURCE`、相关 `CURRENT_FACTS`。
+- 初始模式：`FULL` 或 `CONFIRM`。
+- 最终验收模式：Designer/Coder/Reviewer 输出和证据。
 
-- `USER_GOAL`, `PROJECT_RULES`, `SPEC_SOURCE`, relevant `CURRENT_FACTS`;
-- initial mode: `FULL` or `CONFIRM`;
-- final mode: Designer/Coder/Reviewer outputs and evidence.
+初始输出：
 
-### Required Initial Output
+- 模式。
+- 目标和用户价值。
+- 范围内与范围外。
+- 相关用户流程/信息架构。
+- 权威数据源。
+- 稳定 ID 的验收标准，例如 `AC-01`。
+- 假设和产品风险。
+- 阻塞项。
+- 状态：`READY` 或 `BLOCKED`。
 
-- mode;
-- goal and user value;
-- in-scope and out-of-scope items;
-- user flow/information architecture when relevant;
-- authoritative data sources;
-- acceptance criteria with stable IDs such as `AC-01`;
-- assumptions and product risks;
-- blockers;
-- status: `READY` or `BLOCKED`.
+每条验收标准必须可观察。不要写“表现良好”“看起来不错”等不可测试表述。
 
-Every acceptance criterion must be observable. Avoid “works well,” “looks good,” or other untestable wording.
+最终验收：
 
-### Final Acceptance
+- `ACCEPTED`、`REJECTED` 或 `BLOCKED`。
+- 未满足的验收标准 ID。
+- 是否存在范围漂移。
+- 剩余产品风险。
+- 主 Agent 是否可以交付。
 
-After Reviewer `PASS`, Product maps delivered evidence to every acceptance criterion and returns:
+## Designer 契约
 
-- `ACCEPTED`, `REJECTED`, or `BLOCKED`;
-- unmet criterion IDs;
-- scope drift, if any;
-- remaining product risks;
-- whether the main agent may deliver.
+Designer 负责把已批准产品意图和当前设计事实转成布局、组件映射、token、资源命名、交互、动效和完整组件状态。
 
-## Designer Contract
+Designer 不编辑实现代码，除非主 Agent 明确改变本轮角色范围。
 
-### Responsibility
+输入：
 
-Translate approved product intent and current design facts into layout, component mapping, token usage, resource naming, interaction, motion, and complete component states.
+- Product 输出和验收标准。
+- `DESIGN_SOURCE` 与相关 `.stitch/` 文件。
+- 现有组件、主题、资源、命名约定和平台约束。
+- 需要时读取当前实现。
 
-Designer does not edit implementation code unless the main agent explicitly changes the role scope.
+Stitch 项目必须先读 `.stitch/DESIGN.md`。如果需要新设计决策但权威设计源缺失或冲突，返回 `BLOCKED`。窄范围变更若有唯一现有组件先例，可以复用并引用证据。
 
-### Required Input
+输出：
 
-- Product output and acceptance criteria;
-- `DESIGN_SOURCE` and relevant `.stitch/` files;
-- existing components, themes, resources, naming conventions, and platform constraints;
-- current implementation when needed for translation.
+- 已读取的设计源。
+- 页面/流程结构。
+- 现有组件和资源映射。
+- token 和命名决策。
+- 相关默认、按下/聚焦、禁用、选中、加载、空、错、成功、取消、恢复状态。
+- 交互和动效规则，包括减少动态效果和性能约束。
+- 给 Coder 的实现约束。
+- 设计风险和阻塞项。
+- 状态：`READY` 或 `BLOCKED`。
 
-For a Stitch-backed project, read `.stitch/DESIGN.md` before generating or changing a design. If the task needs new design decisions and the authoritative design source is missing or conflicting, return `BLOCKED`. For a narrow change with a unique existing component precedent, reuse it and cite the precedent.
+项目设计事实优先于 `taste-quality-gate` 和所有插件示例。
 
-### Required Output
+## Coder 契约
 
-- design sources read;
-- page/flow structure;
-- mapping to existing components and resources;
-- token and naming decisions;
-- default, pressed/focused, disabled, selected, loading, empty, error, success, cancellation, and recovery states as relevant;
-- interaction and motion rules, including reduced-motion/performance constraints;
-- Coder implementation constraints;
-- design risks and blockers;
-- status: `READY` or `BLOCKED`.
+Coder 只能在已批准范围内实现，并复用当前仓库架构、命名、模块边界、组件和文档约定。
 
-Project design facts override `taste-quality-gate` and all vendor examples.
+入口门禁：
 
-## Coder Contract
+- Product `READY` 或已记录 `SKIPPED`。
+- Designer `READY` 或已记录 `SKIPPED`。
+- `PROJECT_RULES`、`WRITE_GATE`、相关规格/设计事实、`VALIDATION_POLICY`。
+- 当前仓库状态和 diff，确保不覆盖用户已有改动。
 
-### Responsibility
+行为要求：
 
-Implement only the approved scope using existing repository architecture, naming, module boundaries, components, and documentation conventions.
+- 不扩大范围。
+- 未经明确批准不新增第三方依赖。
+- 不复制参考项目实现。
+- 不覆盖无关用户改动。
+- 保持现有客户端架构，不按后端模式类比套用。
+- 覆盖范围内失败状态，不只实现 happy path。
+- 同步更新项目要求的规格/文档。
+- 只运行授权验证命令。
+- 验证被禁止或不可用时，明确报告未验证声明。
 
-### Entry Gate
+输出：
 
-Coder must receive:
+- 实现摘要。
+- 改动文件和目的。
+- 验收标准映射。
+- 关键技术决策和仓库先例。
+- 依赖和范围说明。
+- 错误/失败处理。
+- 规格/文档同步情况。
+- 新鲜验证证据和未验证项。
+- 风险和 Reviewer 关注点。
+- 状态：`READY` 或 `BLOCKED`。
 
-- Product `READY` or documented `SKIPPED`;
-- Designer `READY` or documented `SKIPPED`;
-- `PROJECT_RULES`, `WRITE_GATE`, relevant specification/design facts, and `VALIDATION_POLICY`;
-- current repository status and diff so existing user changes are preserved.
+## Reviewer 契约
 
-### Required Behavior
+Reviewer 必须独立审查真实 diff/产物，对照 Product 验收标准、Designer 约束、项目规则、规格、文档要求、验证策略和回归风险。不得只依赖 Coder 总结。
 
-- do not expand scope;
-- do not add a third-party dependency without explicit approval;
-- do not copy a reference project implementation;
-- do not overwrite unrelated user changes;
-- preserve existing client architecture rather than applying a backend pattern by analogy;
-- implement in-scope failure states, not only the happy path;
-- update required specs/docs in the same task;
-- run only authorized validation commands;
-- when validation is prohibited or unavailable, report the exact unverified claims.
+审查维度：
 
-### Required Output
+- 需求和范围符合度。
+- 相关设计系统和交互符合度。
+- 正确性和边界情况。
+- 基于真实仓库的架构/模块边界适配。
+- 错误处理和用户反馈。
+- 权限、隐私、安全、数据完整性、计费/广告、文件/存储、并发、性能、生命周期风险。
+- 文档/规格同步。
+- 验证充分性和新鲜度。
+- 回归风险。
 
-- implementation summary;
-- changed files and purpose;
-- acceptance-criterion mapping;
-- key technical decisions and repository precedents used;
-- dependency and scope statement;
-- error/failure handling;
-- specification/documentation synchronization;
-- fresh validation evidence and unverified items;
-- risks and Reviewer focus areas;
-- status: `READY` or `BLOCKED`.
-
-## Reviewer Contract
-
-### Responsibility
-
-Independently review the actual diff/artifacts against Product acceptance criteria, Designer constraints, project rules, specifications, documentation requirements, validation policy, and regression risk. Never rely only on Coder’s summary.
-
-### Required Review Dimensions
-
-- requirement and scope compliance;
-- design-system and interaction compliance when relevant;
-- correctness and edge cases;
-- architecture/module-boundary fit based on the actual repository;
-- error handling and user feedback;
-- permissions, privacy, security, data integrity, billing/ads, files/storage, concurrency, performance, and lifecycle risks when relevant;
-- documentation/specification synchronization;
-- validation sufficiency and freshness;
-- regression risk.
-
-For client apps, review the applicable user path:
+客户端用户路径必须覆盖相关分支：
 
 ```text
-entry -> primary action -> success result
-                     -> failure and recovery
-                     -> cancellation/back
-                     -> permission denial/retry
-                     -> system page or external handoff return
-                     -> process interruption/state restoration
+入口 -> 主操作 -> 成功结果
+             -> 失败与恢复
+             -> 取消/返回
+             -> 权限拒绝/重试
+             -> 系统页或外部跳转返回
+             -> 进程中断/状态恢复
 ```
 
-### Required Finding Format
+问题格式：
 
-Each finding must include:
+- 严重度：`Blocker`、`High`、`Medium`、`Low`。
+- 文件和行号/符号/位置。
+- 违反的验收标准、设计规则或项目规则。
+- 问题和证据。
+- 后果。
+- 建议修正。
+- 是否阻塞：yes/no。
 
-- severity: `Blocker`, `High`, `Medium`, or `Low`;
-- file and line/symbol/location;
-- violated criterion, design rule, or project rule;
-- problem and evidence;
-- consequence;
-- recommended correction;
-- blocking: yes/no.
+结论只能是：
 
-### Verdict
+- `PASS`：无阻塞问题，且 `VALIDATION_POLICY` 要求的验证证据新鲜充分。
+- `REWORK`：仍有可修正问题。
+- `BLOCKED`：无法检查真实 diff、关键事实、授权或必要证据。
 
-Return exactly one:
+如果项目策略只允许静态/人工验证，必须明确说明范围。缺少必要证据不能用信心代替。
 
-- `PASS`: no blocking findings and all validation required by `VALIDATION_POLICY` has fresh sufficient evidence;
-- `REWORK`: correctable findings remain;
-- `BLOCKED`: actual diff, essential facts, authorization, or required evidence cannot be inspected.
+## 通用交接信封
 
-If project policy permits only static/manual validation, state that scope precisely. Lack of required evidence can never be hidden behind confidence.
-
-## Common Handoff Envelope
-
-Every role response must begin with this machine-readable block:
+每个角色回复必须以这个机器可读块开头：
 
 ```yaml
 role: Product | Designer | Coder | Reviewer
@@ -491,58 +498,58 @@ blockers:
 handoff_to: Product | Designer | Coder | Reviewer | Main
 ```
 
-Do not claim a source or skill was read when it was not.
+没有读取的来源或 skill，不得写进 `sources_read` 或 `skills_used`。
 
-## Main-Agent Delivery Gate
+## 主 Agent 交付门禁
 
-Before final delivery, the main agent must verify:
+最终回复前，主 Agent 必须确认：
 
-- participation declaration exists;
-- every selected role returned a terminal status;
-- all `REWORK` loops were closed by a new review;
-- Reviewer is `PASS` when Reviewer is required;
-- Product is `ACCEPTED` when Product participated;
-- actual changed files and fresh validation evidence were inspected;
-- executed and unexecuted validation are distinguished;
-- risks and remaining items are explicit;
-- no child agent or vendor skill bypassed project rules.
+- 已发布参与声明。
+- 每个选中角色都有终态。
+- 所有 `REWORK` 都已重新审查关闭。
+- 需要 Reviewer 时，Reviewer 为 `PASS`。
+- Product 参与时，Product 为 `ACCEPTED`。
+- 已检查真实改动文件和新鲜验证证据。
+- 已区分已执行验证和未执行验证。
+- 风险和剩余事项明确。
+- 没有子 Agent 或插件 skill 绕过项目规则。
 
-Final delivery must summarize:
+最终回复应总结：
 
-- Product decision and final acceptance;
-- Designer decisions, when used;
-- Coder changes, when used;
-- Reviewer verdict and findings, when used;
-- validation evidence and unverified items;
-- risks, remaining work, and whether the request was precisely completed.
+- Product 决策和最终验收。
+- Designer 决策（如使用）。
+- Coder 改动（如使用）。
+- Reviewer 结论和发现（如使用）。
+- 验证证据和未验证项。
+- 风险、剩余工作，以及是否精确完成请求。
 
-## Rationalization Countermeasures
+## 反合理化规则
 
-| Rationalization | Required response |
+| 合理化借口 | 必须响应 |
 |---|---|
-| “It is only one line.” | Classify impact, select/skip roles explicitly, then proceed. Size does not prove low risk. |
-| “The user wants it fast.” | Speed does not override write, design, review, documentation, or acceptance gates. |
-| “Product requirements are obvious.” | Bind an approved specification or Product `CONFIRM`; do not let Coder infer scope. |
-| “The design can be guessed.” | Read the design source or reuse one cited repository precedent; otherwise block. |
-| “A similarly named skill is close enough.” | Do not substitute. Report the missing exact skill and use the role contract. |
-| “The child agent said it passed.” | Inspect the actual diff and fresh evidence independently. |
-| “Tests cannot run, but it should work.” | Report `BLOCKED` or the exact policy-approved limited evidence; do not claim completion. |
-| “Documentation can be updated later.” | If project rules require synchronization, the task remains incomplete. |
-| “Reviewer can fix it directly.” | Return `REWORK` to the responsible role, then review again. |
-| “Product already approved the plan.” | Final acceptance still checks the delivered result against acceptance criteria. |
+| “只是一行。” | 先判断影响，明确选择/跳过角色。大小不能证明低风险。 |
+| “用户要快。” | 速度不能覆盖写入、设计、审查、文档或验收门禁。 |
+| “产品需求很明显。” | 绑定已批准规格或 Product `CONFIRM`，不能让 Coder 自行推断范围。 |
+| “设计可以猜。” | 读取设计源或引用唯一仓库先例，否则 `BLOCKED`。 |
+| “名字相似的 skill 也行。” | 不得替代。报告缺失 skill，并按角色契约处理。 |
+| “子 Agent 说通过了。” | 主 Agent 必须独立检查真实 diff 和新鲜证据。 |
+| “测试跑不了，但应该没问题。” | 报告 `BLOCKED` 或精确说明有限证据，不能声称完成。 |
+| “文档以后再补。” | 如果项目要求同步文档，任务未完成。 |
+| “Reviewer 可以直接修。” | 返回负责角色 `REWORK`，修完后重新审查。 |
+| “Product 已经同意计划。” | 最终验收仍需核对交付结果和验收标准。 |
 
-## Self-Check
+## 自检
 
-Before leaving this skill, answer all with evidence:
+离开本 skill 前，用证据回答：
 
-- Did I bind project, spec, design, write, current-fact, and validation sources?
-- Did I select or explicitly skip every role?
-- Did I explicitly spawn selected Codex custom agents?
-- Did every role use only exact allowlisted skills?
-- Did Coder wait for Product/Designer readiness or documented skips?
-- Did Reviewer inspect actual artifacts and fresh evidence?
-- Did rework return to the responsible role and receive a new review?
-- Did Product perform final acceptance when required?
-- Is the main agent, not a child role, delivering the consolidated result?
+- 是否绑定了项目、规格、设计、写入、当前事实和验证来源？
+- 是否选择或明确跳过了每个角色？
+- 是否明确调用了选中的 Codex custom agents？
+- 每个角色是否只使用精确 allowlist skill？
+- Coder 是否等待 Product/Designer `READY` 或记录 `SKIPPED`？
+- Reviewer 是否检查了真实产物和新鲜证据？
+- 返工是否回到负责角色，并重新审查？
+- 需要 Product 时，Product 是否完成最终验收？
+- 最终交付是否由主 Agent 汇总，而不是子角色直接交付？
 
-Any “no” means the workflow is not ready for delivery.
+任一答案为“否”，流程就不能交付。
