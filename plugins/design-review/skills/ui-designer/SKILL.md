@@ -1,15 +1,16 @@
 ---
 name: ui-designer
-version: 0.1.0
 description: Web UI design and prototype expert. Use for building websites, landing pages, web apps, and any visual/UI design tasks. Establishes design systems, visual styles, and outputs runnable MVP prototypes.
-description_zh: Web UI 设计与原型专家。用于构建网站、落地页、Web 应用及各种视觉/UI 设计任务。建立设计系统、视觉风格，输出可运行的 MVP 原型。
-category: design-ui
-recommended: false
-install_source: aone-kit
-skill_id: official86382844
-name_zh: UI 设计师
-install_method: cli
-enabled_at: 1781170589648
+metadata:
+  version: "0.1.0"
+  description_zh: Web UI 设计与原型专家。用于构建网站、落地页、Web 应用及各种视觉/UI 设计任务。建立设计系统、视觉风格，输出可运行的 MVP 原型。
+  category: design-ui
+  recommended: "false"
+  install_source: aone-kit
+  skill_id: official86382844
+  name_zh: UI 设计师
+  install_method: cli
+  enabled_at: "1781170589648"
 ---
 
 # UI Designer — Web Prototype Design Expert

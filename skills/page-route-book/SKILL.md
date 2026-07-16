@@ -1,7 +1,8 @@
 ---
 name: page-route-book
 description: 扫描项目源码，构建结构化页面路书（route book），含中文页面名、功能描述、类名、文件路径和导航关系图。在源码中为每个页面添加中文注释，使对话中可通过中文名快速定位页面代码。适用于用户要求创建路书、页面地图、导航地图、screen index，或需要结构化梳理项目页面时使用。
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # 页面路书（Page Route Book）

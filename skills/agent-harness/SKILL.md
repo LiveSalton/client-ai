@@ -1,7 +1,8 @@
 ---
 name: agent-harness
 description: 为代码项目搭建 AI Agent Harness 文档体系（AGENTS.md 入口 + doc/ 子文档）。当用户说"搭建 harness"、"配置 harness"、"agent harness"、"AI agent 文档"、"项目 onboarding 文档"时触发。适用于任何需要让 AI Agent 快速理解项目上下文的场景。
-version: 1.0.0
+metadata:
+  version: "1.0.0"
 ---
 
 # Agent Harness 搭建

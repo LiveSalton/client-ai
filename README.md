@@ -32,6 +32,7 @@ client-ai/
     ├── code-review-excellence/
     ├── verification-before-completion/
     ├── android_ui_verification/
+    ├── android-reverse-engineering/
     ├── app-store-optimization/
     ├── code-up-by-wilder/
     ├── code-cleanup-by-wilder/
@@ -44,9 +45,10 @@ client-ai/
     ├── openspec-explore/
     ├── openspec-propose/
     ├── page-route-book/
+    ├── google-play-aso-stack/
+    ├── project-release/
     ├── refactor-cleaner-by-wilder/
     ├── reverse-doc-skill/
-    ├── roadbook-workflows-by-wilder/
     ├── social-gateway-api-sync/
     ├── solution-architecture-by-wilder/
     ├── stitch-design-taste/
@@ -189,6 +191,25 @@ codex plugin add design-review@client-ai
 | `architecture-visualization` | Coder, Reviewer | Product, Designer |
 | `design-review` | Designer, Reviewer | Coder |
 
+### 4. AI 动态任务编排
+
+`skills/multi-agent-collaboration/SKILL.md` 是唯一编排来源，不再增加配置文件、登记表或解析代码。
+
+每个任务由 AI 直接执行下面的流程：
+
+```text
+理解用户目标和项目规则
+  -> 判断 SIMPLE / STANDARD / COMPLEX / HIGH_RISK
+  -> 按风险读取最少必要上下文
+  -> 选择 Product / Designer / Coder / Reviewer
+  -> 从对应角色 allowlist 选择精确 Skill
+  -> 实现、独立审查、必要时 Product 验收
+```
+
+AI 会在发现新事实时重新判断复杂度并扩大上下文，而不是预先读取整个仓库或全部 Skill。触发到某个 Skill 时，必须交给拥有该 Skill 的角色审查和跟进，不能跨角色代跑。
+
+Android 设备和性能验证仍直接使用已存在的外部能力 `test-android-apps:android-emulator-qa` 与 `test-android-apps:android-performance`，两者归 Reviewer；不复制进本仓库，也不通过额外登记文件间接发现。
+
 ## 已收录 Skills
 
 ### 项目协作与文档
@@ -229,7 +250,6 @@ codex plugin add design-review@client-ai
 | Skill | 用途 |
 | --- | --- |
 | `solution-architecture-by-wilder` | 设计或调整系统架构时，梳理职责、接口、数据流和权衡。 |
-| `roadbook-workflows-by-wilder` | 在编码前或落地后生成面向人类理解的 roadbook。 |
 | `openspec-explore` | 进入 OpenSpec 探索模式，用于需求澄清、问题调查和方案讨论。 |
 | `openspec-propose` | 创建 OpenSpec change，并生成 proposal、design、tasks 等提案文档。 |
 | `openspec-apply-change` | 按 OpenSpec change 的任务清单实施变更。 |
@@ -248,8 +268,11 @@ codex plugin add design-review@client-ai
 
 | Skill | 用途 |
 | --- | --- |
-| `android_ui_verification` | 使用 ADB 和 Android Emulator 做端到端 UI 验证。 |
+| `android_ui_verification` | legacy 兼容入口；默认优先由 Reviewer 使用外部 `test-android-apps:android-emulator-qa`，两者不同时加载。 |
+| `android-reverse-engineering` | 对 APK、XAPK、JAR 或 AAR 做反编译、接口提取和调用链分析。 |
 | `app-store-optimization` | App Store 和 Google Play 的 ASO 研究、优化与跟踪。 |
+| `google-play-aso-stack` | Google Play 商店元数据、素材、实验、本地化和评价策略专项。 |
+| `project-release` | 按项目事实编排版本检查、构建、发布和发布后验证。 |
 | `touch-release` | 移动端发布流水线、Fastlane、签名、CI 和 beta 分发。 |
 
 ### 项目特定专项
@@ -284,10 +307,10 @@ codex plugin add design-review@client-ai
 | 角色 | 默认主责 Skill |
 | --- | --- |
 | Main Agent | `multi-agent-collaboration`, `agent-harness` |
-| Product | `before-you-build`, `openspec-explore`, `openspec-propose`, `page-route-book`, `reverse-doc-skill`, `app-store-optimization`, `project-release`, `touch-release`, `architecture-visualization:explore`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer` |
+| Product | `before-you-build`, `openspec-explore`, `openspec-propose`, `page-route-book`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:explore`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer` |
 | Designer | `design-system-patterns`, `interaction-design`, `taste-quality-gate`, `design-md`, `stitch-design-taste`, `stitch-ui-design`, `ui-pixel-replication-by-wilder`, `architecture-visualization:flow-visualizer`, `architecture-visualization:architecture-communicator`, `design-review:design-system-capture`, `design-review:design-md-review`, `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:responsive-design`, `design-review:accessibility-review`, `design-review:ui-designer` |
 | Coder | `code-up-by-wilder`, `coding-standards-by-wilder`, `code-cleanup-by-wilder`, `refactor-cleaner-by-wilder`, `code-rewrite-similarity`, `error-handling-patterns`, `systematic-debugging`, `openspec-apply-change`, `android-reverse-engineering`, `social-gateway-api-sync`, `solution-architecture-by-wilder`, `project-release`, `touch-release`, `architecture-visualization:system-modeler`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:flow-visualizer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:legacy-system-visualizer`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`, `design-review:ui-alignment-review`, `design-review:component-library-alignment`, `design-review:responsive-design` |
-| Reviewer | `code-review-excellence`, `code-reviewer-by-wilder`, `verification-before-completion`, `android_ui_verification`, `openspec-archive-change`, `coding-standards-by-wilder`, `error-handling-patterns`, `reverse-doc-skill`, `app-store-optimization`, `project-release`, `touch-release`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `design-review:design-qa`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review` |
+| Reviewer | `code-review-excellence`, `code-reviewer-by-wilder`, `verification-before-completion`, `android_ui_verification`, `test-android-apps:android-emulator-qa`, `test-android-apps:android-performance`, `openspec-archive-change`, `coding-standards-by-wilder`, `error-handling-patterns`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `design-review:design-qa`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review` |
 
 当前已具备：
 

@@ -1,13 +1,14 @@
 ---
 name: responsive-design
-version: 0.1.0
 description: Implement modern responsive layouts using container queries, fluid typography, CSS Grid, and mobile-first breakpoint strategies. Use when building adaptive interfaces, implementing fluid layouts, or creating component-level responsive behavior.
-description_zh: 使用容器查询、流式排版、CSS Grid 和移动优先断点策略实现现代响应式布局。适用于构建自适应界面、实现流式布局或创建组件级响应式行为。
-category: design-ui
-install_source: aone-kit
-skill_id: official83406837
-name_zh: 响应式设计
-install_method: cli
+metadata:
+  version: "0.1.0"
+  description_zh: 使用容器查询、流式排版、CSS Grid 和移动优先断点策略实现现代响应式布局。适用于构建自适应界面、实现流式布局或创建组件级响应式行为。
+  category: design-ui
+  install_source: aone-kit
+  skill_id: official83406837
+  name_zh: 响应式设计
+  install_method: cli
 ---
 
 # Responsive Design
