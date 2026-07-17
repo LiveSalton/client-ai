@@ -27,6 +27,12 @@ client-ai/
     ├── design-system-patterns/
     ├── interaction-design/
     ├── taste-quality-gate/
+    ├── animation-vocabulary/
+    ├── apple-design/
+    ├── emil-design-eng/
+    ├── find-animation-opportunities/
+    ├── improve-animations/
+    ├── review-animations/
     ├── error-handling-patterns/
     ├── systematic-debugging/
     ├── code-review-excellence/
@@ -217,7 +223,7 @@ Android 设备和性能验证仍直接使用已存在的外部能力 `test-andro
 | Skill | 用途 |
 | --- | --- |
 | `agent-harness` | 为项目生成 `AGENTS.md` 入口和 `doc/` 协作文档体系。 |
-| `multi-agent-collaboration` | 编排 Product、Designer、Coder、Reviewer 的角色门禁、状态机、交接格式和交付门禁。 |
+| `multi-agent-collaboration` | 由 AI 判断任务复杂度、按需读取上下文，并编排 Product、Designer、Coder、Reviewer。 |
 | `before-you-build` | 在新产品、MVP、Agent 工作流或重大功能开工前做产品风险预检。 |
 | `page-route-book` | 扫描页面、生成页面路书，并维护页面中文定位注释。 |
 | `reverse-doc-skill` | 从现有代码反向生成产品文档和技术文档。 |
@@ -264,6 +270,19 @@ Android 设备和性能验证仍直接使用已存在的外部能力 `test-andro
 | `stitch-ui-design` | 编写 Google Stitch UI/UX 设计提示词。 |
 | `ui-pixel-replication-by-wilder` | 统一处理 Figma、截图、CSS 的 UI 像素级复刻和校验。 |
 
+### 动效与设计工程
+
+| Skill | 用途 |
+| --- | --- |
+| `emil-design-eng` | UI 精修、组件设计和动效决策的综合设计工程原则。 |
+| `review-animations` | 按严格标准独立审查现有动效实现。 |
+| `improve-animations` | 只读审计整个代码库的动效，并生成可执行改进计划。 |
+| `find-animation-opportunities` | 发现真正值得增加动效的位置，并拒绝无意义动效。 |
+| `animation-vocabulary` | 把模糊动效描述映射为准确术语。 |
+| `apple-design` | Apple 风格的界面、手势、物理动效和设计原则，面向 Web 实现。 |
+
+以上 6 个 Skill 来自 [emilkowalski/skills](https://github.com/emilkowalski/skills)，固定到提交 `6bf24434f7730ad169077756cf9c7cd7bd675fc6`，许可证为 MIT。正文和辅助文件保持上游内容；仅将 `review-animations` 的非标准顶层字段无损下沉到 `metadata` 以通过 Codex 校验。`multi-agent-collaboration` 只负责角色路由；Android/Flutter 不得照搬其中的 CSS、WAAPI 或 React 实现。
+
 ### 移动端专项
 
 | Skill | 用途 |
@@ -302,15 +321,15 @@ Android 设备和性能验证仍直接使用已存在的外部能力 `test-andro
 
 ### 角色 Skill 分配
 
-`multi-agent-collaboration` 是完整路由源，这里只保留人类可快速扫描的摘要。当前只启用 Product、Designer、Coder、Reviewer 四个核心角色；架构、QA、发布、安全、数据能力先由四个核心角色按 skill 路由承担。
+`multi-agent-collaboration` 是唯一完整路由源。README 只保留职责摘要，不重复维护精确 Skill ID；当前只启用 Product、Designer、Coder、Reviewer 四个核心角色。
 
-| 角色 | 默认主责 Skill |
+| 角色 | 动态职责 |
 | --- | --- |
-| Main Agent | `multi-agent-collaboration`, `agent-harness` |
-| Product | `before-you-build`, `openspec-explore`, `openspec-propose`, `page-route-book`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:explore`, `architecture-visualization:flow-visualizer`, `architecture-visualization:dependency-impact-analyzer` |
-| Designer | `design-system-patterns`, `interaction-design`, `taste-quality-gate`, `design-md`, `stitch-design-taste`, `stitch-ui-design`, `ui-pixel-replication-by-wilder`, `architecture-visualization:flow-visualizer`, `architecture-visualization:architecture-communicator`, `design-review:design-system-capture`, `design-review:design-md-review`, `design-review:design-qa`, `design-review:ui-alignment-review`, `design-review:responsive-design`, `design-review:accessibility-review`, `design-review:ui-designer` |
-| Coder | `code-up-by-wilder`, `coding-standards-by-wilder`, `code-cleanup-by-wilder`, `refactor-cleaner-by-wilder`, `code-rewrite-similarity`, `error-handling-patterns`, `systematic-debugging`, `openspec-apply-change`, `android-reverse-engineering`, `social-gateway-api-sync`, `solution-architecture-by-wilder`, `project-release`, `touch-release`, `architecture-visualization:system-modeler`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:flow-visualizer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `architecture-visualization:legacy-system-visualizer`, `architecture-visualization:c4model`, `architecture-visualization:graphviz`, `architecture-visualization:drawio`, `design-review:ui-alignment-review`, `design-review:component-library-alignment`, `design-review:responsive-design` |
-| Reviewer | `code-review-excellence`, `code-reviewer-by-wilder`, `verification-before-completion`, `android_ui_verification`, `test-android-apps:android-emulator-qa`, `test-android-apps:android-performance`, `openspec-archive-change`, `coding-standards-by-wilder`, `error-handling-patterns`, `reverse-doc-skill`, `app-store-optimization`, `google-play-aso-stack`, `project-release`, `touch-release`, `architecture-visualization:risk-quality-reviewer`, `architecture-visualization:architecture-health`, `architecture-visualization:dependency-impact-analyzer`, `architecture-visualization:deployment-topology-analyzer`, `architecture-visualization:evolution-planner`, `design-review:design-qa`, `design-review:visual-regression-review`, `design-review:accessibility-review`, `design-review:component-library-alignment`, `design-review:design-debt-review`, `design-review:design-md-review` |
+| Main Agent | 判断复杂度、选择上下文/角色/Skill，并汇总最终交付。 |
+| Product | 定义或确认目标、范围、流程和验收标准，并在需要时做最终验收。 |
+| Designer | 处理 UI、交互、资源、状态、响应式和可访问性约束。 |
+| Coder | 在批准范围内修改代码、配置、资源、规格或脚本。 |
+| Reviewer | 独立检查真实产物、验证证据、回归风险和角色边界。 |
 
 当前已具备：
 
